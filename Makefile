@@ -19,19 +19,10 @@ all:   	binary samples
 
 binary:	bin/vmsubmit.py
 
-samples: 	sample/victoria sample/veronica sample/olivia sample/molson	\
+samples: 	sample/molson	\
         sample/molson/hercules.window.rc    \
         sample/molson/molson.conf  \
-        sample/molson/screen.rc      \
-        sample/olivia/hercules.window.rc    \
-        sample/olivia/olivia.conf  \
-        sample/olivia/screen.rc      \
-        sample/veronica/hercules.window.rc    \
-        sample/veronica/screen.rc      \
-        sample/veronica/veronica.conf  \
-        sample/victoria/hercules.window.rc    \
-        sample/victoria/screen.rc      \
-        sample/victoria/victoria.conf 
+        sample/molson/screen.rc 
 
-bin sample/victoria sample/veronica sample/olivia sample/molson:
+bin sample/molson:
 	mkdir -p $@
