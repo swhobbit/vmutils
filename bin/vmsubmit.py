@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-"""Send an text file to VM reader with a header card to direct it to a user."""
+"""Send a text file to a user via the ßVM reader or UTF protocol"""
 
 import argparse
 import getpass
-import httplib
+from http import client
 from os import path
 import socket
 import sys
@@ -23,7 +23,7 @@ def _ParseCommandLine(command_line):
   """Parse program arguments"""
 
   def _PositiveInteger(value):
-    """Convert passed value to an integer and verify it is a positive value."""
+    """Convert passed value to a postive integer and verify it."""
     ivalue = int(value)
     if ivalue <= 0:
       raise argparse.ArgumentTypeError(
@@ -35,7 +35,6 @@ def _ParseCommandLine(command_line):
       'a networked emulated system reader (the default) or '
       'via the Sender-Initiated/Unsolicited File Transfer (SIFT/UFT) '
       'protocol as (incompletely) defined in RFC 1440.',
-      version=__version__,
       epilog=__copyright__
   )
   parser.add_argument(
@@ -144,14 +143,14 @@ def _ParseCommandLine(command_line):
 def _Expect(network_socket, prompt, expected):
   """Write single line to the UFT server and look for the expected response"""
   if prompt:
-    network_socket.sendall(prompt + "\r\n")
-    print "Sent:", prompt
+    network_socket.sendall((prompt + '\r\n').encode('utf-8'))
+    print('Sent:', prompt)
 
   if expected:
     expected = str(expected)
     actual = network_socket.recv(512)
     if expected and not actual.startswith(expected):
-      raise httplib.BadStatusLine(
+      raise client.BadStatusLine(
           '\nSent: {:s},\nExpected: {:s},\nReceived: {:s}'.format(prompt,
                                                                   expected,
                                                                   actual))
@@ -167,25 +166,25 @@ def _UftPrologue(login,              # pylint: disable=R0913
                  is_ebcdic,
                  network_socket):
   """Generate header records for a UFT submission"""
-  _Expect(network_socket, None, "220")
+  _Expect(network_socket, None, '2')
   _Expect(network_socket,
-          "FILE {:d} {:s}".format(length,
+          'ILE {:d} {:s'.format(length,
                                   str.upper(getpass.getuser())),
-          httplib.CREATED)
+          client.CREATED)
   _Expect(network_socket,
-          "USER {:s}@{:s}".format(login, hostname),
-          httplib.CREATED)
+          'SER {:s}@{:s'.format(login, hostname),
+          client.CREATED)
 
   if is_ebcdic:
-    _Expect(network_socket, 'TYPE F 80', httplib.CREATED)
+    _Expect(network_socket, 'TYPE F 80', client.CREATED)
   else:
-    _Expect(network_socket, 'TYPE A', httplib.CREATED)
+    _Expect(network_socket, 'TYPE A', client.CREATED)
 
   _Expect(network_socket,
           'NAME {:s}.{:s}'.format(fname, ftype),
-          httplib.CREATED)
-  _Expect(network_socket, 'DATE {:s}'.format(date), httplib.CREATED)
-  _Expect(network_socket, 'DATA {:d}'.format(length), httplib.CREATED)
+          client.CREATED)
+  _Expect(network_socket, 'DATE {:s}'.format(date), client.CREATED)
+  _Expect(network_socket, 'DATA {:d}'.format(length), client.CREATED)
   return
 
 
@@ -212,14 +211,14 @@ def _ReaderPrologue(login,
       )
 
   if is_ebcdic:
-    id_card = "{:80}".format(id_card).translate(TRANSLATE_TABLE)
-    read_card = "{:80}".format(read_card).translate(TRANSLATE_TABLE)
+    id_card = ':80'.format(id_card).translate(TRANSLATE_TABLE)
+    read_card = ':80'.format(read_card).translate(TRANSLATE_TABLE)
   else:
     id_card += '\n'
     read_card += '\n'
 
-  network_socket.sendall(id_card)
-  network_socket.sendall(read_card)
+  network_socket.sendall(id_card.encode('utf-8'))
+  network_socket.sendall(read_card.encode('utf-8'))
   return
 
 
@@ -261,13 +260,13 @@ def _ProcessFile(file_handle, keyword_arguments):   # pylint: disable=R0914
 
   if is_uft:
     data_buffer = data_buffer.replace('\n', '\r\n')
-    print 'Opening UFT host {:s} port {:d} for user {:s} file {:s} {:s} {:s}'.format(
+    print('Opening UFT host {:s} port {:d} for user {:s} file {:s} {:s} {:s}'.format(
         keyword_arguments['host'],
         keyword_arguments['port_uft'],
         keyword_arguments['login'],
         fname,
         ftype,
-        fmode)
+        fmode))
     network_socket = socket.create_connection((keyword_arguments['host'],
                                                keyword_arguments['port_uft']))
     _UftPrologue(keyword_arguments['login'],
@@ -280,13 +279,14 @@ def _ProcessFile(file_handle, keyword_arguments):   # pylint: disable=R0914
                  is_ebcdic,
                  network_socket)
   else:
-    print 'Opening reader on host {:s} port {:d} for user {:s} file {:s} {:s} {:s}'.format(
-        keyword_arguments['host'],
-        port,
-        keyword_arguments['login'],
-        fname,
-        ftype,
-        fmode)
+    print('Opening reader on host '
+        '{:s} port {:d} for user {:s} file {:s} {:s} {:s}'.format(
+            keyword_arguments['host'],
+            port,
+            keyword_arguments['login'],
+            fname,
+            ftype,
+            fmode))
     network_socket = socket.create_connection((keyword_arguments['host'], port))
     _ReaderPrologue(keyword_arguments['login'],
                     fname,
@@ -296,11 +296,11 @@ def _ProcessFile(file_handle, keyword_arguments):   # pylint: disable=R0914
                     is_ebcdic,
                     network_socket)
 
-  network_socket.sendall(data_buffer)       # pylint: disable=E1101
+  network_socket.sendall(data_buffer.encode('utf-8'))
 
   if is_uft:
-    _Expect(network_socket, "EOF", "213")
-    _Expect(network_socket, "QUIT", "250")
+    _Expect(network_socket, 'EOF", "213')
+    _Expect(network_socket, 'QUIT", "250')
 
   network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
   network_socket.close()
@@ -405,7 +405,7 @@ def _MakeTranslateTable():
       '>':0x6E,
       '?':0x6F,
       ' ':0x40,
-      u'¬':0x5F,                              # "¬" is Unicode
+      u'¬':0x5F,                              # '¬' is Unicode
   }
   for key, value in translate_map.items():
     result[ord(key)] = chr(value)
@@ -423,11 +423,11 @@ def _Main():
     if first:
       first = False
     else:
-      # Allow Hercules side networking/IO to catch up, else it may get rejected
-      # by hercules (which reports no error back to us!).
+      # Allow Hercules side networking/IO to catch up, else it may get
+      # rejected by hercules (which reports no error back to us!).
       time.sleep(keyword_arguments['sleep'])
 
     _ProcessFile(current, keyword_arguments)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   sys.exit(_Main())
