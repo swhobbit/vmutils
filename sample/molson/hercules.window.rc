@@ -1,0 +1,7 @@
+sf- *
+pause 5
+sf+ * 
+pause 2
+# sh screen -t operator c3270.sh console@127.0.0.1  ${HERCULES_PORT}
+sh screen -t log less +F -S -I log/${HERCULES_NAME}.log
+ipl 140

@@ -1,0 +1,32 @@
+# vim: ts=8 noexpandtab sts=8
+
+setenv HERCULES_RC	hercules.window.rc
+setenv HERCULES_NAME	molson
+setenv HERCULES_PORT	3277
+setenv HERCULES_WEB	8087
+
+nethack on
+sessionname ${HERCULES_NAME}
+autodetach on
+
+# don't display the copyright page
+startup_message off
+
+# emulate .logout message
+pow_detach_msg "Screen session of \$LOGNAME \$:cr:\$:nl:ended."
+
+defscrollback 1000
+
+altscreen on
+
+hardstatus alwayslastline "%w %= %H%? %l%?"
+# hardstatus alwayslastline '%{= kG}[ %{G}%H | %{=kw}%?%-Lw%?%{g}%n*%f%t%?(%u)%? %{g}]%{w}%?%+Lw%?%?%=%{g}[ %{K}%l %{g}][ %{B}%Y-%m-%d %{W    }%c %{g}]'
+startup_message off
+nethack on
+
+chdir ${HOME}/hercules/${HERCULES_NAME} 
+
+sh mkdir log
+screen -t hercules-${HERCULES_NAME} 0 ${HOME}/bin/hercules.sh log/${HERCULES_NAME}.log
+
+# detach
