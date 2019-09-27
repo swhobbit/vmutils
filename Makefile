@@ -1,15 +1,15 @@
 # vim: ts=8 noexpandtab
 
-sample/molson/%:  sample/molson	${HOME}/hercules/molson/%
+sample/molson/%:  ${HOME}/hercules/molson/%
 	cp "$<" "$@"
 
-sample/olivia/%:  sample/olivia	${HOME}/hercules/olivia/%
+sample/olivia/%:  ${HOME}/hercules/olivia/%
 	cp "$<" "$@"
 
-sample/veronica/%:  sample/veronica	${HOME}/hercules/veronica/%
+sample/veronica/%:  ${HOME}/hercules/veronica/%
 	cp "$<" "$@"
 
-sample/victoria/%:  sample/victoria	${HOME}/hercules/victoria/%
+sample/victoria/%:  ${HOME}/hercules/victoria/%
 	cp "$<" "$@"
 
 bin/%:  ${HOME}/bin/%
@@ -20,22 +20,16 @@ all:   	binary samples
 binary:	bin/vmsubmit.py
 
 samples: 	sample/victoria sample/veronica sample/olivia sample/molson	\
-        sample/molson/hercules.windows.rc    \
+        sample/molson/hercules.window.rc    \
         sample/molson/molson.conf  \
         sample/molson/screen.rc      \
-        sample/olivia/hercules.windows.rc    \
+        sample/olivia/hercules.window.rc    \
         sample/olivia/olivia.conf  \
         sample/olivia/screen.rc      \
-        sample/veronica/hercules.windows.rc    \
-        sample/veronica/hercules.windows.rc    \
-        sample/veronica/hercules.windows.rc    \
-        sample/veronica/screen.rc      \
-        sample/veronica/screen.rc      \
+        sample/veronica/hercules.window.rc    \
         sample/veronica/screen.rc      \
         sample/veronica/veronica.conf  \
-        sample/veronica/veronica.conf  \
-        sample/veronica/veronica.conf  \
-        sample/victoria/hercules.windows.rc    \
+        sample/victoria/hercules.window.rc    \
         sample/victoria/screen.rc      \
         sample/victoria/victoria.conf 
 
