@@ -8,7 +8,7 @@ bin/%:  ${HOME}/bin/%
 
 all:   	binary
 
-binary:	bin/vmsubmit.py bin/hercules.sh 
+binary:	bin/vmsubmit.py bin/hercules.sh bin/6to4_tunnel.sh
 
 samples: 	sample/molson	\
         sample/molson/hercules.window.rc    \
