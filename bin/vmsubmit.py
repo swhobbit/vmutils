@@ -299,8 +299,8 @@ def _ProcessFile(file_handle, keyword_arguments):   # pylint: disable=R0914
   network_socket.sendall(data_buffer.encode('utf-8'))
 
   if is_uft:
-    _Expect(network_socket, 'EOF", "213')
-    _Expect(network_socket, 'QUIT", "250')
+    _Expect(network_socket, 'EOF', '213')
+    _Expect(network_socket, 'QUIT', '250')
 
   network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
   network_socket.close()
