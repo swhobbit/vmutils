@@ -14,19 +14,27 @@ def _Dump(table):
   """Execute tcpdump and process the output."""
   argv = list(sys.argv)
   argv[0] = 'tcpdump'
+  print(' '.join(argv))
   # <tab>	0x0000:  3333 0000 0001 dca6 3202 5864 86dd 600a
-  regex = re.compile(r'^\t0x[\dabcdef]{4}:  (([\dabcdef]{2,4} )+)  .*$')
+  regex = re.compile(
+      r'\s+0x[0123456789abcdef]+:\s+(([0123456789abcdef]+( |$))+)')
 
-  with subprocess.Popen(argv, stdout=subprocess.PIPE, text=True) as data:
-    match = regex.fullmatch(regex, data)
-    if not match:
-      print(data.rstrip(),)
-    else:
-      output = '\t'
+  proc = subprocess.Popen(argv,
+    			  bufsize=1,
+  			  stdout=subprocess.PIPE,
+			  stderr=subprocess.STDOUT,
+			  text=True) 
+  for data in proc.stdout:
+    print(data.rstrip(), end='')
+    match = regex.match(data)
+    if match:
       digits = match.group(1).replace(' ', '')
+      print('\t', end='', sep='')
       for i in range(0, len(digits), 2):
-        output += table[chr(int(digits[i:i+1], 16))]
-      print(output)
+        byte = digits[i:i+2]
+        byte = table[int(byte, 16)]
+        print(byte, sep='', end='')
+    print()
 
 def _MakeTranslateTable():
   """Build an ASCII to EBCDIC translation table."""
@@ -136,8 +144,8 @@ def _MakeTranslateTable():
 
 def _Main():
   """Main program."""
-  _Dump(_MakeTranslateTable)
+  _Dump(_MakeTranslateTable())
   sys.exit(0)
 
-if __name__ == '__Main__':
+if __name__ == '__main__':
   _Main()
