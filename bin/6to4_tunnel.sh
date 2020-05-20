@@ -38,16 +38,17 @@
 #	6tunnel commands, or is able & willing to enter their sudo password every
 #	time this script is run.
 
-# sample-host.hh.kew.com has address 192.168.205.2
-# sample-host.hh.kew.com has IPv6 address 2001:4567:b:3987:3456:68dd:fe00:cd02
 SOURCE_HOST="${1:?'Missing host name'}"
 SOURCE_PORT="${2:?'Missing port number'}"
 TARGET_HOST="${3:-${SOURCE_HOST}}"
-TARGET_PORT="${3:-${SOURCE_PORT}}"
+TARGET_PORT="${4:-${SOURCE_PORT}}"
+
+# sample-host.hh.kew.com has address 192.168.205.2
+# sample-host.hh.kew.com has IPv6 address 2001:4567:b:3987:3456:68dd:fe00:cd02
 IPv6=`host -t AAAA ${SOURCE_HOST} | awk '/has IPv6 address/ {print $5}'`
 
-# Make the current host an aliases of the IPv6 host address 
-ip addr add ${IPv6}/64  dev eth0
+# Make the current host an alias of the IPv6 host address 
+sudo ip addr add ${IPv6}/64  dev eth0
 
 sudo 6tunnel -u nobody -6 -4 -l ${SOURCE_HOST} ${SOURCE_PORT} ${TARGET_HOST} ${TARGET_PORT}
 exit $?

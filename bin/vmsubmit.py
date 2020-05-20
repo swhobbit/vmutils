@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
-"""Send a text file to a user via the ßVM reader or UTF protocol"""
+"""Send a text file to a user via the VM reader or UTF protocol"""
 
 import argparse
 import getpass
