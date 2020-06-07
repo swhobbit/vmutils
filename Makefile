@@ -3,12 +3,19 @@
 sample/molson/%:  ${HOME}/hercules/molson/%
 	cp "$<" "$@"
 
+sbin/%:  /usr/local/sbin/%
+	cp "$<" "$@"
+
 bin/%:  ${HOME}/bin/%
 	cp "$<" "$@"
+
+
 
 all:   	binary
 
 binary:	bin	\
+	sbin	\
+	sbin/dump-to-disk.sh	\
 	bin/vmsubmit.py	\
 	bin/hercules.sh	\
 	bin/6to4_tunnel.sh	\
@@ -20,5 +27,5 @@ samples: 	sample/molson	\
         sample/molson/molson.conf  \
         sample/molson/screen.rc 
 
-bin sample/molson:
+bin sbin sample/molson:
 	mkdir -p $@
