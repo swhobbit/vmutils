@@ -55,23 +55,25 @@ fi
 if [ -d ${TARGET_DIRECTORY} ] ; then
   dpkg -l > /etc/current-package-list.txt
   cd /
-  exec tar -zc	\
-    --file ${TARGET_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz	\
-    ${INCREMENTAL_OPTION}	\
-    --exclude=.cache	\
-    --exclude=backup	\
-    --one-file-system	\
-    --atime-preserve	\
-    --acls		\
-    $@	\
-    ${BOOT}	\
-    etc	\
-    export	\
-    home	\
-    ${LOCAL_HOME}	\
-    ${LOCAL_GIT}	\
-    usr/local/bin	\
-    usr/local/sbin
+  exec tar	\
+	-c	\
+	--use-compress-program=pigz	\
+	--file ${TARGET_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz	\
+	${INCREMENTAL_OPTION}	\
+	--exclude=.cache	\
+	--exclude=backup	\
+	--one-file-system	\
+	--atime-preserve	\
+	--acls		\
+	$@	\
+	${BOOT}	\
+	etc	\
+	export	\
+	home	\
+	${LOCAL_HOME}	\
+	${LOCAL_GIT}	\
+	usr/local/bin	\
+	usr/local/sbin
 else
   echo ${TARGET_DIRECTORY} does not exist
   exit 99
