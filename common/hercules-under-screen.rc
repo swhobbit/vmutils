@@ -1,0 +1,39 @@
+# We reference all variable usage via shell commands because HERCULES_RC
+# doesn't natively expand them.
+
+sh xtitle ${HERCULES_NAME} Hercules
+sh [ -d log ] || mkdir log
+sh rm -f hercules.script log/syslog-${HERCULES_NAME}.log hercules-${HERCULES_NAME}.log
+
+# Automaticly route any TAP network device to our local live subnet
+
+sh printf 'log log/hercules-%s.log\n'	${HERCULES_NAME}	> hercules.script 
+sh printf 'hao tgt HHCLC055I (tap[0-9]+)\n'		>> hercules.script 
+sh printf 'hao cmd sh hercules_route_lcs.py -d $1 %s.oat\n'	${HERCULES_NAME}	>> hercules.script 
+script hercules.script
+
+sh screen -t console	1	c3270	console@hercules ${HERCULES_CONSOLE}
+
+# Must be after issuing the log to file command (and file is opened!), above.
+sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
+
+# We run most disk R/O so the shadow file merge below never wipes the
+# first generation; live updates go into the second generation. 
+#
+# Nightly backups are your friend!
+
+sf- *
+pause 5
+sf+ * 
+
+pause 5
+
+sh printf 'ipl %s\n'	${HERCULES_IPL}	> hercules.script
+script hercules.script
+
+pause 20
+
+# Run any machine specific commands, like "less" on the MVS log or a pr3287 session.
+sh [ -x hercules.coda.sh ] && ./hercules.coda.sh
+
+sh rm hercules.script

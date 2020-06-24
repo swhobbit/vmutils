@@ -9,11 +9,12 @@ sbin/%:  /usr/local/sbin/%
 bin/%:  ${HOME}/bin/%
 	cp "$<" "$@"
 
+common/%: ${HOME}/hercules/common/%
+	cp "$<" "$@"
 
+all:   	binary_files common_files
 
-all:   	binary
-
-binary:	bin	\
+binary_files:	bin	\
 	sbin	\
 	sbin/dump-to-disk.sh	\
 	bin/vmsubmit.py	\
@@ -22,10 +23,15 @@ binary:	bin	\
 	bin/hercules.sh	\
 	bin/hercules_route_lcs.py
 
-samples: 	sample/molson	\
+common_files:	common	\
+	common/hercules-370-common.conf	\
+	common/hercules-under-screen.rc	\
+	common/screen-hercules.rc
+
+samples_files: 	sample/molson	\
         sample/molson/hercules.window.rc    \
         sample/molson/molson.conf  \
         sample/molson/screen.rc 
 
-bin sbin sample/molson:
+bin sbin common sample/molson:
 	mkdir -p $@
