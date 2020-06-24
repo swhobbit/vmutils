@@ -7,10 +7,12 @@ LOG=${LOG_DIRECTORY}/${HERCULES_NAME}.log
 SCREEN_COUNT="`screen -ls ${HERCULES_NAME} | grep -c ${HERCULES_NAME}`"
 if [ ${SCREEN_COUNT} -gt 1 ] ; then 
   echo "Hercules ${HERCULES_NAME} already running!"
+  screen -ls
   sleep 5
   exit 99
 elif [ ${SCREEN_COUNT} -ne 1 ] ; then                                             
   echo "Hercules ${HERCULES_NAME} not found in screen -ls output!" 
+  screen -ls
   sleep 5
   exit 99 
 fi
