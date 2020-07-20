@@ -18,6 +18,7 @@ import re
 import sys
 
 # pylint: disable=C0301
+#       ....+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9....+....*....+....1....+....2....+....3..
 #       ****R  START  JOB    1  AHDLSCAT  A.H.DERBYSHIRE        ROOM TSO    3.52.41 PM 18 NOV 15  PRINTER1  SYS KEWS  JOB    1  START  R****
 #       ****R   END   JOB 9991  AHDLSCAT  Derbyshire-123456789  ROOM TSOX  23.52.41 PM 18 NOV 15  PRINTER1  SYS KEWS  JOB 9991   END   R****
 #       ****A   END   JOB    6  MVS0080   Build Netsol          ROOM        3.57.55 PM 26 NOV 15  PRINTER1  SYS KEWS  JOB    6   END   A****
@@ -26,8 +27,8 @@ import sys
 _PATTERN = (
     r'\*{4,4}'                              # ****
     r'(?P<class>[A-Z0-9])'                  # sysout class
-    r'   END'                               # START/END
-    r'   (?P<type>JOB|STC|TSU)'             # JOB/TSU/STC
+    r'  (?P<edge>START| END )'              # START/END
+    r'  (?P<type>JOB|STC|TSU)'              # JOB/TSU/STC
     r' (?P<number>[ \d]{4,4})'              # job number
     r'  (?P<name>[A-Z0-9@#$ ]{8,8})'        # job name
     r'  (.{20,20})'                         # programmer name
@@ -38,8 +39,8 @@ _PATTERN = (
     r'  SYS (?P<system>[\w ]{4,4})'         # system name
     r'  (?P=type)'                          # JOB/TSU/STC
     r' (?P=number)'                         # job number
-    r'   END'                               # START/END
-    r'   (?P=class)'                        # sysout class
+    r'  (?P=edge)'                          # START/END
+    r'  (?P=class)'                         # sysout class
     r'\*{4,4}'                              # ****
 )
 _REGEX = re.compile(_PATTERN)
@@ -66,6 +67,7 @@ def _GetLine():
 def _Process():
   """Main processing loop.  Never exits until program shutdown."""
   buffer = []
+  eof = False
   dictionary = {}
 
   while True:
@@ -76,12 +78,14 @@ def _Process():
     matches = re.match(_REGEX, line.strip())
     if matches:
       dictionary = matches.groupdict()
-      buffer.append(line)
-    elif dictionary and line.startswith('\f'):
+      eof = dictionary['edge'] == ' END '
+      print(dictionary)
+    elif dictionary and eof and line.startswith('\f'):
       output_base = '-'.join((
           dictionary['name'],
           dictionary['number'].replace(' ', '0'),
-          dictionary['class'])).replace(' ', '').replace('$', '_')
+          dictionary['class'])).replace(' ', '')
+      output_base = output_base.replace('$', '_').replace('/', '-')
       output_name = output_base + '.txt'
 
       if not os.path.exists(dictionary['type']):
