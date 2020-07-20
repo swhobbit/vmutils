@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 
-"""Split spooled output from a Hercules emulated machine running MVS (with
-JES2) into individual files based on their trailing JES2 banner. To use,
-insert into Hercules configuration:
+"""Split JES2 spool output running in MVS under a Hercules emulated
+machine into individual files based on their trailing JES2 banner.
+
+Module written November, 2016.
+
+To use, insert into the Hercules configuration:
 
 	000E    1403    |${HOME}/bin/spool.py
 
 where 000E is the address of a JES2 controlled printer with separator
-pages enabled.
+pages enabled.  
+
+You may also want to tune JES2 parms in SYS1.JES2PARM(JES2PARM) to set
+the number of separator page lines to 1:
+
+	&PRIDCT=1 
 """
 
 __author__ = "ahd@kew.com (Drew Derbyshire)"
