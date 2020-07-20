@@ -14,14 +14,15 @@ common/%: ${HOME}/hercules/common/%
 
 all:   	binary_files common_files
 
-binary_files:	bin	\
-	sbin	\
-	sbin/dump-to-disk.sh	\
-	bin/vmsubmit.py	\
-	bin/hercules.sh	\
+binary_files:	\
+	bin	\
 	bin/6to4_tunnel.sh	\
+	bin/hercules_route_lcs.py	\
 	bin/hercules.sh	\
-	bin/hercules_route_lcs.py
+	bin/spool.py	\
+	bin/vmsubmit.py	\
+	sbin	\
+	sbin/dump-to-disk.sh
 
 common_files:	common	\
 	common/hercules-370-common.conf	\
