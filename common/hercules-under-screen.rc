@@ -1,20 +1,7 @@
-# We reference all variable usage via shell commands because HERCULES_RC
-# doesn't natively expand them.
-sh rm -f hercules.script
-
-sh printf '# Running script\n'        > hercules.script
-
-# Set up our logging if hercules.sh didn't redirect the program to log
-
-# sh [ -d log ] || mkdir log
-# sh printf 'log log/hercules-%s.log\n'	${HERCULES_NAME}	>> hercules.script
-
 # Automatically route any TAP network device to our local live subnet
 
-sh printf 'hao tgt HHCLC055I (tap[0-9]+)\n'		>> hercules.script
-sh printf 'hao cmd sh hercules_route_lcs.py -d $1 %s.oat\n'	${HERCULES_NAME}	>> hercules.script
-
-script hercules.script
+hao tgt HHCLC055I (tap[0-9]+)\n
+hao cmd sh hercules_route_lcs.py -d $1 %s.oat
 
 # If ESA or Z arch and running OS, when SYSCONs goes active make it an
 # active console
@@ -38,12 +25,9 @@ sf+ *
 
 pause 5
 
-sh printf 'ipl %s\n'	${HERCULES_IPL}	> hercules.script
-script hercules.script
+ipl $(HERCULES_IPL)
 
 pause 20
 
 # Run any machine specific commands, like "less" on the MVS log or a pr3287 session.
 sh [ -x hercules.coda.sh ] && ./hercules.coda.sh
-
-sh rm hercules.script
