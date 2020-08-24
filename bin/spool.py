@@ -10,12 +10,12 @@ To use, insert into the Hercules configuration:
 	000E    1403    |${HOME}/bin/spool.py
 
 where 000E is the address of a JES2 controlled printer with separator
-pages enabled.  
+pages enabled.
 
 You may also want to tune JES2 parms in SYS1.JES2PARM(JES2PARM) to set
 the number of separator page lines to 1:
 
-	&PRIDCT=1 
+	&PRIDCT=1
 """
 
 __author__ = "ahd@kew.com (Drew Derbyshire)"
@@ -87,7 +87,6 @@ def _Process():
     if matches:
       dictionary = matches.groupdict()
       eof = dictionary['edge'] == ' END '
-      print(dictionary)
     elif dictionary and eof and line.startswith('\f'):
       output_base = '-'.join((
           dictionary['name'],
