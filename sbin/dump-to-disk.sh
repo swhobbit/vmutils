@@ -129,7 +129,8 @@ for entry in	\
 	home	\
 	usr/local/bin	\
 	usr/local/home	\
-	usr/local/sbin
+	usr/local/sbin	\
+	var/www
   do
     if [ -d ${entry} -o -f ${entry} ] ; then
       DIRECTORIES="${DIRECTORIES} ${entry}"
