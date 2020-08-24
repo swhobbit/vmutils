@@ -2,6 +2,9 @@
 NOW=`date +%F_%H.%M.%S`
 BACKUP_DIRECTORY=/export/backup
 DIFFERENTIAL_TOUCH_FILE="${BACKUP_DIRECTORY}/status-backup-$(hostname -s).touch"
+
+# Full backups are DAYS_OF_DIFFERENTIAl_BACKUP + 1 (6 + 1 = weekyl, for example)
+DAYS_OF_DIFFERENTIAl_BACKUP=6
 DAY_OF_WEEK=$(date +"%w")
 MYNAME="`basename $0`"
 
@@ -70,9 +73,16 @@ fi
 chmod go= ${BACKUP_DIRECTORY}
 umask 0077
 
-# Delete obsolete (over 6 days old) touch files (which will force a
-# full backup)
-find ${BACKUP_DIRECTORY} -name "`basename ${DIFFERENTIAL_TOUCH_FILE}`" -daystart -mtime +6 -ls -delete
+# Delete obsolete (over DAYS_OF_DIFFERENTIAl_BACKUP days old) touch files
+# (which will force a full backup every DAYS_OF_DIFFERENTIAl_BACKUP + 1
+# days).
+find	\
+	${BACKUP_DIRECTORY}	\
+	-name "`basename ${DIFFERENTIAL_TOUCH_FILE}`" \
+	-daystart	\
+	-mtime +${DAYS_OF_DIFFERENTIAl_BACKUP}	\
+	-ls	\
+	-delete
 
 # Take a full backup when status file does not exist (see above), and
 # differential dumps based on that dump.
