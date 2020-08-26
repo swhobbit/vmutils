@@ -3,12 +3,13 @@ NOW=`date +%F_%H.%M.%S`
 BACKUP_DIRECTORY=/export/backup
 DIFFERENTIAL_TOUCH_FILE="${BACKUP_DIRECTORY}/status-backup-$(hostname -s).touch"
 
-# Full backups are DAYS_OF_DIFFERENTIAl_BACKUP + 1 (6 + 1 = weekyl, for example)
+# Full backups are DAYS_OF_DIFFERENTIAl_BACKUP + 1 (6 + 1 = weekly, for example)
 DAYS_OF_DIFFERENTIAl_BACKUP=6
 DAY_OF_WEEK=$(date +"%w")
 MYNAME="`basename $0`"
 
-# Log an message to system log; may also log to system error --stderr passed
+
+# Log an message to system log; may also log to system error if --stderr passed
 log_message () { 
 	priority=$1
 	shift 
@@ -18,7 +19,6 @@ log_message () {
 		--tag=${MYNAME}	\
 		--priority daemon.${priority}	\
 		"$@"
-
 }
 
 
@@ -45,8 +45,8 @@ is_directory_fs_root () {
 		# directory is a child directory 
 		return 1
 	fi
-
 }
+
 
 # Always record current package list
 dpkg -l > /etc/current-package-list.txt
@@ -69,7 +69,7 @@ else
  exit 99
 fi
 
-# Prevent non-root backups to the directory and its files
+# Prevent non-owner access to the directory and its files
 chmod go= ${BACKUP_DIRECTORY}
 umask 0077
 
@@ -104,7 +104,7 @@ DIRECTORIES=""
 # (That it is, don't call cause errors by trying to backup things which
 # do not exist on the current system.
 
-# Directories only backed up if their own file system
+# Directories only backed up only if the root of their own file system
 for entry in	\
       export/git	\
       home/hercules
@@ -115,7 +115,7 @@ for entry in	\
     fi
   done
 
-# Directories/files backed up unconditionally.  
+# Directories/files which backed up unconditionally (if they exist).  
 #
 # NOTE: The directories are not de-dupped by tar; for example, if
 #       fee/fie is on the same file system as fee, it will get
@@ -156,7 +156,7 @@ TAR_RETURN_CODE=$?
 # If backup is clean, and we have a new differential timestamp, make it
 # the real one.
 if [ ${TAR_RETURN_CODE} -ne 0 ] ; then 
-  log_error Backup failed, return code ${TAR_RETURN_CODE} 
+  log_error ${BACKUP_TYPE} backup failed, return code ${TAR_RETURN_CODE} 
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
   log_notice --stderr ${BACKUP_TYPE} complete, and be will the baseline for differential backups.
