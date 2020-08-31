@@ -9,7 +9,7 @@ hao cmd sh hercules_route_lcs.py -d $1 %s.oat
 hao tgt HHCCP041I SYSCONS interface active
 hao cmd scp vary cn(*),activate
 
-sh screen -t console	1	c3270	console@hercules ${HERCULES_CONSOLE}
+sh screen -t console	1	c3270	console@127.0.0.1 ${HERCULES_CONSOLE}
 
 # Must be after issuing the log to file command (and file is opened!), above.
 sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
