@@ -1,19 +1,19 @@
 # vim: ts=8 noexpandtab
 
 sample/molson/%:  ${HOME}/hercules/molson/%
-	cp "$<" "$@"
+	cp -f "$<" "$@"
 
 cron/%:  /etc/cron.d/%
-	cp "$<" "$@"
+	cp -f "$<" "$@"
 
 sbin/%:  /usr/local/sbin/%
-	cp "$<" "$@"
+	cp -f "$<" "$@"
 
 bin/%:  ${HOME}/bin/%
-	cp "$<" "$@"
+	cp -f "$<" "$@"
 
 common/%: ${HOME}/hercules/common/%
-	cp "$<" "$@"
+	cp -f "$<" "$@"
 
 all:   	binary_files common_files cron_files
 
