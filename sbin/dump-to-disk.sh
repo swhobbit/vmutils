@@ -155,13 +155,19 @@ TAR_RETURN_CODE=$?
 
 # If backup is clean, and we have a new differential timestamp, make it
 # the real one.
+
 if [ ${TAR_RETURN_CODE} -ne 0 ] ; then 
-  log_error ${BACKUP_TYPE} backup failed, return code ${TAR_RETURN_CODE} 
+  echo ''
+  log_error --stderr	\
+  	"${BACKUP_TYPE} backup failed, return code ${TAR_RETURN_CODE}."
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
-  log_notice --stderr ${BACKUP_TYPE} complete, and be will the baseline for differential backups.
+  echo ''
+  log_notice --stderr	\
+  	"${BACKUP_TYPE} backup complete,"	\
+	"and be will the baseline for differential backups."
 else 
-  log_notice ${BACKUP_TYPE} backup complete.
+  log_notice "${BACKUP_TYPE} backup complete."
 fi
 
 exit ${TAR_RETURN_CODE}
