@@ -1,0 +1,33 @@
+# Automatically route any TAP network device to our local live subnet
+
+hao tgt HHCLC055I (tap[0-9]+)\n
+hao cmd sh hercules_route_lcs.py -d $1 %s.oat
+
+# If ESA or Z arch and running OS, when SYSCONs goes active make it an
+# active console
+
+hao tgt HHCCP041I SYSCONS interface active
+hao cmd scp vary cn(*),activate
+
+sh screen -t console	1	c3270	console@127.0.0.1 ${HERCULES_CONSOLE}
+
+# Must be after issuing the log to file command (and file is opened!), above.
+sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
+
+# We run most disk R/O so the shadow file merge below never wipes the
+# first generation; live updates go into the second generation.
+#
+# Nightly backups are your friend!
+
+sf- *
+pause 5
+sf+ *
+
+pause 5
+
+ipl $(HERCULES_IPL)
+
+pause 20
+
+# Run any machine specific commands, like "less" on the MVS log or a pr3287 session.
+sh [ -x hercules.coda.sh ] && ./hercules.coda.sh

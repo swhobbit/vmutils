@@ -1,0 +1,39 @@
+#!/usr/bin/screen -c 
+
+# vim: ts=8 noexpandtab sts=8
+
+# The hercules.environment has the follow commands in it, mostly used
+# by the hercules.conf for a particaular machine and shell scripts run in
+# support of it. THIS script needs HERCULES_NAME name set both to set
+# the name for locking used by ${HOME}/bin/hercules.sh
+#
+# setenv  HERCULES_NAME		# The name machine is known by
+# setenv  HERCULES_CPU		# Number of CPUs, default is 1
+# setenv  HERCULES_IPL		
+# setenv  HERCULES_SERIAL	# default is 012449 (old IBM Kingston)
+# setenv  HERCULES_CORE		# default is 16M
+# setenv  HERCULES_PASSWORD	# for the web interface
+#
+# Our common configuration expects the following ports defined; they MUST
+# be unique for each machine on same host. We tend to use 327n, 144n, and 
+# 808n, where n is the same digit for a single machine
+#
+# setenv  HERCULES_CONSOLE
+# setenv  HERCULES_READER 
+# setenv  HERCULES_WEB    
+
+source hercules.environment
+
+altscreen	on
+autodetach	on
+defscrollback	1000
+hardstatus	alwayslastline "%{Rk} %S %{kW} %h %n%f %t %= %H%? %l %{Rk} %S "
+nethack		on
+sessionname	${HERCULES_NAME}
+setenv		HERCULES_RC      ../common/hercules-under-screen.rc 
+startup_message off
+
+# Run the primary task; the HERCULES_RC defined above will fire off the
+# associated 3270 console, log viewers, and printer tasks (if any)
+
+screen -t hercules 0 ${HOME}/bin/hercules.sh 

@@ -1,24 +1,45 @@
 # vim: ts=8 noexpandtab
 
 sample/molson/%:  ${HOME}/hercules/molson/%
-	cp "$<" "$@"
+	cp -f "$<" "$@"
+
+cron/%:  /etc/cron.d/%
+	cp -f "$<" "$@"
+
+sbin/%:  /usr/local/sbin/%
+	cp -f "$<" "$@"
 
 bin/%:  ${HOME}/bin/%
-	cp "$<" "$@"
+	cp -f "$<" "$@"
 
-all:   	binary
+common/%: ${HOME}/hercules/common/%
+	cp -f "$<" "$@"
 
-binary:	bin	\
-	bin/vmsubmit.py	\
-	bin/hercules.sh	\
+all:   	binary_files common_files cron_files
+
+binary_files:	\
+	bin	\
 	bin/6to4_tunnel.sh	\
+	bin/hercules_route_lcs.py	\
 	bin/hercules.sh	\
-	bin/hercules_route_lcs.py
+	bin/spool.py	\
+	bin/vmsubmit.py	\
+	sbin	\
+	sbin/dump-to-disk.sh
 
-samples: 	sample/molson	\
+common_files:	common	\
+	common/hercules-370-common.conf	\
+	common/hercules-under-screen.rc	\
+	common/screen-hercules.rc
+
+cron_files:	\
+	cron	\
+	cron/dump
+
+samples_files: 	sample/molson	\
         sample/molson/hercules.window.rc    \
         sample/molson/molson.conf  \
         sample/molson/screen.rc 
 
-bin sample/molson:
+cron bin sbin common sample/molson:
 	mkdir -p $@

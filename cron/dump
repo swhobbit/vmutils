@@ -1,0 +1,11 @@
+# Install as /etc/cron.d/dumpl make sure you have mail configured to
+# get the results sent to you.
+
+# Dump select directories every moning at 2:39 AM
+39 2 * * *	root /usr/local/sbin/dump-to-disk.sh
+
+# Since reboots often herald major changes, backup immediately after reoot
+@reboot		root sleep 60  && /usr/local/sbin/dump-to-disk.sh
+
+# Weekly, delete backups older than 150 days.
+59 1 * * Sun	root find /export/backup -maxdepth 1 -type f -atime +150 -ls -delete  && echo '' && df -H -t ext4
