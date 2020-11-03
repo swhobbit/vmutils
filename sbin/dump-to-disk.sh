@@ -165,7 +165,9 @@ elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   echo ''
   log_notice --stderr	\
   	"${BACKUP_TYPE} backup complete,"	\
-	"and be will the baseline for differential backups."
+	"and will be the baseline for differential backups."
+  echo ''
+  df -H ${BACKUP_DIRECTORY}
 else 
   log_notice "${BACKUP_TYPE} backup complete."
 fi
