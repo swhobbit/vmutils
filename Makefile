@@ -28,6 +28,7 @@ binary_files:	\
 	sbin/dump-to-disk.sh
 
 common_files:	common	\
+	common/kew-herclogo.txt	\
 	common/hercules-370-common.conf	\
 	common/hercules-under-screen.rc	\
 	common/screen-hercules.rc

@@ -1,0 +1,27 @@
+@SF P
+
+
+@SBA 5,1
+@ALIGN CENTER
+Welcome to Kendra Electronic Wonderworks
+
+@SF HP
+@ALIGN NONE
+@SBA  7,26
+ _  __  ______  __          __
+@SBA 8,26
+| |/ / |  ____| \ \        / /
+@SBA 9,26
+| ' /  | |__     \ \  /\  / /
+@SBA 10,26
+|  <   |  __|     \ \/  \/ /
+@SBA 11,26
+| . \  | |____     \  /\  /
+@SBA 12,26
+|_|\_\ |______|     \/  \/
+
+@SF P
+@SBA 15,1
+@ALIGN CENTER
+Hercules version $(VERSION) on host $(HOSTNAME) (port $(HERCULES_CONSOLE))
+Terminal $(CUU) on system $(LPARNAME)
