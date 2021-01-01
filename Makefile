@@ -25,6 +25,7 @@ binary_files:	\
 	bin/spool.py	\
 	bin/vmsubmit.py	\
 	sbin	\
+	sbin/cpu-temp.sh	\
 	sbin/dump-to-disk.sh
 
 common_files:	common	\
@@ -35,12 +36,13 @@ common_files:	common	\
 
 cron_files:	\
 	cron	\
+	cron/cpu-temp	\
 	cron/dump
 
 samples_files: 	sample/molson	\
         sample/molson/hercules.window.rc    \
         sample/molson/molson.conf  \
-        sample/molson/screen.rc 
+        sample/molson/screen.rc
 
 cron bin sbin common sample/molson:
 	mkdir -p $@
