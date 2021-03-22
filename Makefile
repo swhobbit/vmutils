@@ -26,7 +26,7 @@ binary_files:	\
 	bin/vmsubmit.py	\
 	sbin	\
 	sbin/cpu-temp.sh	\
-	sbin/dump-to-disk.sh
+	sbin/dump-to-backup-disk.sh
 
 common_files:	common	\
 	common/kew-herclogo.txt	\

@@ -2,10 +2,10 @@
 # get the results sent to you.
 
 # Dump select directories every moning at 2:39 AM
-39 2 * * *	root /usr/local/sbin/dump-to-disk.sh
+39 2 * * *	root /usr/local/sbin/dump-to-backup-disk.sh
 
 # Since reboots often herald major changes, backup immediately after reoot
-@reboot		root sleep 60  && /usr/local/sbin/dump-to-disk.sh
+@reboot		root sleep 60  && /usr/local/sbin/dump-to-backup-disk.sh
 
-# Weekly, delete backups older than 75 days.
-59 1 * * Sun	root find /export/backup -maxdepth 1 -type f -atime +75 -ls -delete  && echo '' && df -H -t ext4
+# Weekly, delete backups as disk gets full
+59 1 * * Sun	root /usr/local/sbin/clean-up-backup-disk.sh
