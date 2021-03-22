@@ -2,22 +2,30 @@
 
 # vim: ts=8 noexpandtab sts=8
 
-# The hercules.environment has the follow commands in it, mostly used
-# by the hercules.conf for a particaular machine and shell scripts run in
+# Install screen, hercules, and c3270 before running this.
+
+# Run this script from the main directory of a Hercules instance to bring
+# up a Hercules instance under screen. Use a window size of 80x27 to have
+# room for a console with a c3270 menu bar at the top and both c3270 &
+# screen status lines at the bottom.
+
+# The hercules.environment has the following variables in it, mostly used
+# by the hercules.conf for a particular machine and shell scripts run in
 # support of it. THIS script needs HERCULES_NAME name set both to set
-# the name for locking used by ${HOME}/bin/hercules.sh
-#
-# setenv  HERCULES_NAME		# The name machine is known by
+# the name for locking used by ${HOME}/bin/hercules.sh and set the LPAR
+# name.
+
+# setenv  HERCULES_NAME		# The name machine is known by (directory)
 # setenv  HERCULES_CPU		# Number of CPUs, default is 1
-# setenv  HERCULES_IPL		
-# setenv  HERCULES_SERIAL	# default is 012449 (old IBM Kingston)
-# setenv  HERCULES_CORE		# default is 16M
+# setenv  HERCULES_IPL		# DASD address of IPL volume
+# setenv  HERCULES_SERIAL	# default is 012449 (IBM Kingston zip code)
+# setenv  HERCULES_CORE		# memory -- default is 16M
 # setenv  HERCULES_PASSWORD	# for the web interface
-#
+
 # Our common configuration expects the following ports defined; they MUST
 # be unique for each machine on same host. We tend to use 327n, 144n, and 
-# 808n, where n is the same digit for a single machine
-#
+# 808n, where n is the same digit for a single emulated machine
+
 # setenv  HERCULES_CONSOLE
 # setenv  HERCULES_READER 
 # setenv  HERCULES_WEB    

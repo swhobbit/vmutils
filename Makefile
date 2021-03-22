@@ -1,5 +1,8 @@
 # vim: ts=8 noexpandtab
 
+# This Makefile pulls working files into this directory for archival
+# via git.
+
 sample/molson/%:  ${HOME}/hercules/molson/%
 	cp -f "$<" "$@"
 
