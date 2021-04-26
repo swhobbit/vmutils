@@ -163,6 +163,7 @@ if [ ${TAR_RETURN_CODE} -ne 0 ] ; then
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
   echo ''
+  ls -l -h ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
   log_notice --stderr	\
   	"${BACKUP_TYPE} backup complete,"	\
 	"and will be the baseline for differential backups."
