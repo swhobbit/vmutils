@@ -29,6 +29,7 @@ binary_files:	\
 	bin/vmsubmit.py	\
 	sbin	\
 	sbin/cpu-temp.sh	\
+	sbin/clean-up-backup-disk.sh	\
 	sbin/dump-to-backup-disk.sh
 
 common_files:	common	\

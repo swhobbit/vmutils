@@ -4,8 +4,5 @@
 # Dump select directories every moning at 2:39 AM
 39 2 * * *	root /usr/local/sbin/dump-to-backup-disk.sh
 
-# Since reboots often herald major changes, backup immediately after reoot
+# Since reboots often herald major changes, backup immediately after reboot
 @reboot		root sleep 60  && /usr/local/sbin/dump-to-backup-disk.sh
-
-# Weekly, delete backups as disk gets full
-59 1 * * Sun	root /usr/local/sbin/clean-up-backup-disk.sh

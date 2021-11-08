@@ -92,6 +92,9 @@ if [ ! -f ${DIFFERENTIAL_TOUCH_FILE} ] ; then
   touch "${DIFFERENTIAL_TOUCH_FILE}.new"
   INCREMENTAL_OPTION=""
   BACKUP_TYPE=full
+
+  # Clean old backups before writing disk
+  /usr/local/sbin/clean-up-backup-disk.sh
 else
   INCREMENTAL_OPTION="--newer-mtime ${DIFFERENTIAL_TOUCH_FILE}"
   BACKUP_TYPE=diff
@@ -160,6 +163,7 @@ if [ ${TAR_RETURN_CODE} -ne 0 ] ; then
   echo ''
   log_error --stderr	\
   	"${BACKUP_TYPE} backup failed, return code ${TAR_RETURN_CODE}."
+  rm "${DIFFERENTIAL_TOUCH_FILE}.new"
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
   echo ''
