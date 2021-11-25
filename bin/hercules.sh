@@ -21,22 +21,29 @@
 # *                    Kenmore, WA                                     *
 # *------------------------------------------------------------------- *
 
-BINARY_LINK="${HOME}/bin/hercules/${HERCULES_NAME:?'NO SYSTEM NAME SET'}"
+BINARY_LINK="${HOME}/bin/hercules.d/${HERCULES_NAME:?'NO SYSTEM NAME SET'}"
 LOG_DIRECTORY=log
 LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}.log
 
 # Check if we're already running under screen.
 SCREEN_COUNT="`screen -ls ${HERCULES_NAME} | fgrep -w -c ${HERCULES_NAME}`"
 if [ ${SCREEN_COUNT} -gt 1 ] ; then
-  echo "Hercules ${HERCULES_NAME} already running!"
+  echo "Hercules ${HERCULES_NAME} already running! Exiting."
   screen -ls
-  sleep 10
+  sleep 5
   exit 99
 elif [ ${SCREEN_COUNT} -ne 1 ] ; then
-  echo "Hercules ${HERCULES_NAME} not found in screen -ls output!"
+  echo "Hercules ${HERCULES_NAME} not found in screen -ls output! Exiting."
   screen -ls
-  sleep  10
+  sleep  5
   exit 99
+fi
+
+# Make sure we can find hercules binary
+if [ -z $(which hercules) ] ; then
+  echo "hercules binary not found! Exiting."
+  sleep 5
+  exit 98
 fi
 
 [ -d ${LOG_DIRECTORY} ]		|| mkdir -p ${LOG_DIRECTORY}

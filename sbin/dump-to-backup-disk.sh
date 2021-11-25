@@ -150,7 +150,7 @@ tar	\
       --exclude=.cache	\
       --exclude=backup	\
       --one-file-system	\
-      --atime-preserve	\
+      --atime-preserve=system	\
       --acls		\
       $@	\
       ${DIRECTORIES}
@@ -163,7 +163,7 @@ if [ ${TAR_RETURN_CODE} -ne 0 ] ; then
   echo ''
   log_error --stderr	\
   	"${BACKUP_TYPE} backup failed, return code ${TAR_RETURN_CODE}."
-  rm "${DIFFERENTIAL_TOUCH_FILE}.new"
+  rm -f "${DIFFERENTIAL_TOUCH_FILE}.new"
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
   echo ''
