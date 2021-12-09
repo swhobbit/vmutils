@@ -23,6 +23,7 @@ all:   	binary_files common_files cron_files
 binary_files:	\
 	bin	\
 	bin/6to4_tunnel.sh	\
+	bin/datestamp.sh	\
 	bin/hercules_route_lcs.py	\
 	bin/hercules.sh	\
 	bin/spool.py	\

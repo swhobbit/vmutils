@@ -59,5 +59,5 @@ fi
 
 ln -s "$(which hercules)" "${BINARY_LINK}"
 
-echo "${BINARY_LINK}" -f ${HERCULES_NAME}.conf ">" ${LOG_PATH}
-"${BINARY_LINK}" -f ${HERCULES_NAME}.conf > ${LOG_PATH}
+echo "${BINARY_LINK}" -f ${HERCULES_NAME}.conf "|" datestamp ">" ${LOG_PATH}
+"${BINARY_LINK}" -f ${HERCULES_NAME}.conf | datestamp.sh > ${LOG_PATH}
