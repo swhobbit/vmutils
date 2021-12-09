@@ -6,12 +6,14 @@
 import argparse
 import getpass
 from http import client
+import http
 from os import path
+import os
 import socket
 import sys
 import time
 
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 __author__ = 'ahd@kew.com (Andrew H. Derbyshire)'
 __copyright__ = ('Copyright 2018-2019 by Kendra Electronic Wonderworks.  '
                  'All commercial rights reserved.\n'
@@ -78,7 +80,7 @@ def _ParseCommandLine(command_line):
   parser.add_argument(
       '-p',
       '--port_ascii',
-      default=3505,
+      default=os.getenv('HERCULES_ASCII_READER', default='14425'),
       metavar='APORT',
       help='Port number of reader on host for ASCII files '
       '(Default: %(default)s)',
@@ -88,7 +90,7 @@ def _ParseCommandLine(command_line):
       '-P',
       '--port_ebcdic',
       metavar='EPORT',
-      default=2540,
+      default=os.getenv('HERCULES_EBCDIC_READER', default='25405'),
       help='Port number of reader on host for EBCDIC files '
       '(Default: %(default)s)',
       type=_PositiveInteger,
@@ -135,32 +137,44 @@ def _ParseCommandLine(command_line):
       'file',
       nargs='+',
       help='File(s) to send to VM',
-      type=argparse.FileType('r'),
+      type=str,
   )
   return parser.parse_args(command_line)
+
+def _Send(network_socket, buffer, translate=False):
+  """Write buffer, translating if needed and making strings bytes."""
+  if translate:
+    buffer = buffer.translate(TRANSLATE_TABLE)
+
+  if isinstance(buffer, str):
+    buffer = bytes.fromhex(''.join('{:02x}'.format(ord(x)) for x in buffer))
+    print('Sending {:d} string bytes'.format(len(buffer)))
+  else:
+    print('Sending {:d} data bytes'.format(len(buffer)))
+
+  network_socket.sendall(buffer)
 
 
 def _Expect(network_socket, prompt, expected):
   """Write single line to the UFT server and look for the expected response"""
   if prompt:
-    network_socket.sendall((prompt + '\r\n').encode('utf-8'))
+    _Send(network_socket, prompt)
+    _Send(network_socket, b'\r\n')
     print('Sent:', prompt)
 
   if expected:
-    expected = str(expected)
-    actual = network_socket.recv(512)
-    if expected and not actual.startswith(expected):
+    expected = str(expected)  # Might be an integer
+    actual = network_socket.recv(512).decode(encoding='utf-8')
+    if not actual.startswith(expected):
       raise client.BadStatusLine(
           '\nSent: {:s},\nExpected: {:s},\nReceived: {:s}'.format(prompt,
                                                                   expected,
                                                                   actual))
-  return
 
 def _UftPrologue(login,              # pylint: disable=R0913
                  hostname,
                  fname,
                  ftype,
-                 fmode,
                  length,
                  date,
                  is_ebcdic,
@@ -168,24 +182,23 @@ def _UftPrologue(login,              # pylint: disable=R0913
   """Generate header records for a UFT submission"""
   _Expect(network_socket, None, '2')
   _Expect(network_socket,
-          'ILE {:d} {:s'.format(length,
+          'FILE {:d} {:s}'.format(length,
                                   str.upper(getpass.getuser())),
-          client.CREATED)
+          http.HTTPStatus.CREATED)
   _Expect(network_socket,
-          'SER {:s}@{:s'.format(login, hostname),
-          client.CREATED)
+          'USER {:s}@{:s}'.format(login, hostname),
+          http.HTTPStatus.CREATED)
 
   if is_ebcdic:
-    _Expect(network_socket, 'TYPE F 80', client.CREATED)
+    _Expect(network_socket, 'TYPE F 80', http.HTTPStatus.CREATED)
   else:
-    _Expect(network_socket, 'TYPE A', client.CREATED)
+    _Expect(network_socket, 'TYPE A', http.HTTPStatus.CREATED)
 
   _Expect(network_socket,
           'NAME {:s}.{:s}'.format(fname, ftype),
-          client.CREATED)
-  _Expect(network_socket, 'DATE {:s}'.format(date), client.CREATED)
-  _Expect(network_socket, 'DATA {:d}'.format(length), client.CREATED)
-  return
+          http.HTTPStatus.CREATED)
+  _Expect(network_socket, 'DATE {:s}'.format(date), http.HTTPStatus.CREATED)
+  _Expect(network_socket, 'DATA {:d}'.format(length), http.HTTPStatus.CREATED)
 
 
 def _ReaderPrologue(login,
@@ -211,24 +224,23 @@ def _ReaderPrologue(login,
       )
 
   if is_ebcdic:
-    id_card = ':80'.format(id_card).translate(TRANSLATE_TABLE)
-    read_card = ':80'.format(read_card).translate(TRANSLATE_TABLE)
+    id_card = '{:80}'.format(id_card).translate(TRANSLATE_TABLE)
+    read_card = '{:80}'.format(read_card).translate(TRANSLATE_TABLE)
   else:
     id_card += '\n'
     read_card += '\n'
 
-  network_socket.sendall(id_card.encode('utf-8'))
-  network_socket.sendall(read_card.encode('utf-8'))
-  return
+  _Send(network_socket, id_card)
+  _Send(network_socket, read_card)
 
 
-def _ProcessFile(file_handle, keyword_arguments):   # pylint: disable=R0914
+def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
   """Send a single file to VM, prefixed by USERID and READ cards."""
-  full_name = path.abspath(path.expanduser(file_handle.name))
-  file_name = path.basename(full_name)
-  date = time.strftime('%D %T', time.localtime(path.getmtime(full_name)))
+  full_name = path.abspath(path.expanduser(file_path))
   length = path.getsize(full_name)
+  date = time.strftime('%D %T', time.localtime(path.getmtime(full_name)))
 
+  file_name = path.basename(full_name)
   vm_file_name = file_name.strip().strip('.').replace('_',
                                                       '$').upper().split('.')
   fname = vm_file_name[0]
@@ -247,9 +259,13 @@ def _ProcessFile(file_handle, keyword_arguments):   # pylint: disable=R0914
     raise RuntimeError(error)
 
   if is_ebcdic:
+    print('File', fname, ftype, 'is EBCDIC')
     port = keyword_arguments['port_ebcdic']
+    file_handle = open(full_name, 'rb')
   else:
+    print('File', fname, ftype, 'is ASCII')
     port = keyword_arguments['port_ascii']
+    file_handle = open(full_name, 'rt', encoding='utf-8')
 
   data_buffer = file_handle.read()
   file_handle.close()
@@ -258,52 +274,55 @@ def _ProcessFile(file_handle, keyword_arguments):   # pylint: disable=R0914
   if (not is_ebcdic and data_buffer and data_buffer[-1] != '\n'):
     data_buffer += '\n'
 
-  if is_uft:
-    data_buffer = data_buffer.replace('\n', '\r\n')
-    print('Opening UFT host {:s} port {:d} for user {:s} file {:s} {:s} {:s}'.format(
-        keyword_arguments['host'],
-        keyword_arguments['port_uft'],
-        keyword_arguments['login'],
-        fname,
-        ftype,
-        fmode))
-    network_socket = socket.create_connection((keyword_arguments['host'],
-                                               keyword_arguments['port_uft']))
-    _UftPrologue(keyword_arguments['login'],
-                 keyword_arguments['uft_host'],
-                 fname,
-                 ftype,
-                 fmode,
-                 len(data_buffer),
-                 date,
-                 is_ebcdic,
-                 network_socket)
-  else:
-    print('Opening reader on host '
-        '{:s} port {:d} for user {:s} file {:s} {:s} {:s}'.format(
-            keyword_arguments['host'],
-            port,
-            keyword_arguments['login'],
-            fname,
-            ftype,
-            fmode))
-    network_socket = socket.create_connection((keyword_arguments['host'], port))
-    _ReaderPrologue(keyword_arguments['login'],
-                    fname,
-                    ftype,
-                    fmode,
-                    date,
-                    is_ebcdic,
-                    network_socket)
+  try:
+    if is_uft:
+      data_buffer = data_buffer.replace('\n', '\r\n')
+      print('Opening UFT host {:s} port {:d} for user '
+            '{:s} file {:s} {:s}'.format(
+                keyword_arguments['host'],
+                keyword_arguments['port_uft'],
+                keyword_arguments['login'],
+                fname,
+                ftype))
+      network_socket = socket.create_connection((keyword_arguments['host'],
+                                                 keyword_arguments['port_uft']))
+      _UftPrologue(keyword_arguments['login'],
+                   keyword_arguments['uft_host'],
+                   fname,
+                   ftype,
+                   len(data_buffer),
+                   date,
+                   is_ebcdic,
+                   network_socket)
+    else:
+      print('Opening reader on host {:s} port {:d} for user '
+            '{:s} file {:s} {:s} {:s}'.format(
+                keyword_arguments['host'],
+                port,
+                keyword_arguments['login'],
+                fname,
+                ftype,
+                fmode))
+      network_socket = socket.create_connection((keyword_arguments['host'], port))
+      _ReaderPrologue(keyword_arguments['login'],
+                      fname,
+                      ftype,
+                      fmode,
+                      date,
+                      is_ebcdic,
+                      network_socket)
 
-  network_socket.sendall(data_buffer.encode('utf-8'))
+    _Send(network_socket, data_buffer)
 
-  if is_uft:
-    _Expect(network_socket, 'EOF', '213')
-    _Expect(network_socket, 'QUIT', '250')
-
-  network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
-  network_socket.close()
+    if is_uft:
+      _Expect(network_socket, 'EOF', '213')
+      _Expect(network_socket, 'QUIT', '250')
+  finally:
+    try:
+      network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
+    except (OSError, ConnectionResetError) as ex:
+      print('Error during shutdown of socket:', ex)
+    network_socket.close()
 
 
 def _MakeTranslateTable():
@@ -413,19 +432,18 @@ def _MakeTranslateTable():
 
 
 def _Main():
-  """Main program, requests arg processing and then sends each named files."""
+  """Main program, requests arg processing and then sends each named file."""
   args = _ParseCommandLine(sys.argv[1:])
   global TRANSLATE_TABLE                # pylint: disable=W0603
   TRANSLATE_TABLE = _MakeTranslateTable()
   keyword_arguments = vars(args)
   first = True
   for current in args.file:
-    if first:
-      first = False
-    else:
+    if not first:
       # Allow Hercules side networking/IO to catch up, else it may get
       # rejected by hercules (which reports no error back to us!).
       time.sleep(keyword_arguments['sleep'])
+    first = False
 
     _ProcessFile(current, keyword_arguments)
 
