@@ -24,6 +24,19 @@
 BINARY_LINK="${HOME}/bin/hercules.d/${HERCULES_NAME:?'NO SYSTEM NAME SET'}"
 LOG_DIRECTORY=log
 LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}.log
+OLD_LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}-$(date -r ${LOG_PATH} +%F_%H.%M.%S).log
+
+
+SYSLOG_PATH=${LOG_DIRECTORY}/syslog-${HERCULES_NAME}.log
+OLD_SYSLOG_PATH=${LOG_DIRECTORY}/syslog-${HERCULES_NAME}-$(date -r ${SYSLOG_PATH} +%F_%H.%M.%S).log
+
+if [ -s ${LOG_PATH} ] ; then
+        mv ${LOG_PATH} ${OLD_LOG_PATH}
+fi
+
+if [ -s ${SYSLOG_PATH} ] ; then
+        mv ${SYSLOG_PATH} ${OLD_SYSLOG_PATH}
+fi
 
 # Check if we're already running under screen.
 SCREEN_COUNT="`screen -ls ${HERCULES_NAME} | fgrep -w -c ${HERCULES_NAME}`"
