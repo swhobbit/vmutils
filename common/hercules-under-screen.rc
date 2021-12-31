@@ -1,17 +1,21 @@
+sh screen -t console	1	c3270	console@127.0.0.1 ${HERCULES_CONSOLE}
+
+# This assumes logging is started from the command line that Hercules is invoked
+# via
+sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
+
 # If ESA or Z arch and running OS, when SYSCONs goes active make it an
 # active console
-
 hao tgt HHCCP041I SYSCONS interface active
 hao cmd scp vary cn(*),activate
+
+# Use HASP, not ASP, after MVT clock set
+hao tgt IEE116A
+hao cmd /r 00,auto=n
 
 # Automatically route any TAP network device to the local live subnet
 hao tgt HHCLC055I (tap[0-9]+)
 hao cmd sh hercules_route_lcs.py -d $1 $(HERCULES_NAME).oat
-
-sh screen -t console	1	c3270	console@127.0.0.1 ${HERCULES_CONSOLE}
-
-# Must be after issuing the log to file command (and file is opened!), above.
-sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
 
 # We run most base disk R/O so the shadow file merge below never wipes the
 # first generation; live updates go into the second generation.
