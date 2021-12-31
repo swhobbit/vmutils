@@ -15,7 +15,7 @@ import time
 
 __version__ = '1.1.2'
 __author__ = 'ahd@kew.com (Andrew H. Derbyshire)'
-__copyright__ = ('Copyright 2018-2019 by Kendra Electronic Wonderworks.  '
+__copyright__ = ('Copyright 2018-2021 by Kendra Electronic Wonderworks.  '
                  'All commercial rights reserved.\n'
                  'Version ' + __version__)
 
@@ -147,6 +147,8 @@ def _Send(network_socket, buffer, translate=False):
     buffer = buffer.translate(TRANSLATE_TABLE)
 
   if isinstance(buffer, str):
+    # Don't trust Python locale to do the right thing; this brute force
+    # handles conversion in ASCII -or- if we translated to EBCDIC above.
     buffer = bytes.fromhex(''.join('{:02x}'.format(ord(x)) for x in buffer))
     print('Sending {:d} string bytes'.format(len(buffer)))
   else:
@@ -303,7 +305,8 @@ def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
                 fname,
                 ftype,
                 fmode))
-      network_socket = socket.create_connection((keyword_arguments['host'], port))
+      network_socket = socket.create_connection(
+          (keyword_arguments['host'], port))
       _ReaderPrologue(keyword_arguments['login'],
                       fname,
                       ftype,
