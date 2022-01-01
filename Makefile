@@ -27,6 +27,7 @@ binary_files:	\
 	bin/hercules_route_lcs.py	\
 	bin/hercules.sh	\
 	bin/spool.py	\
+	bin/tcpdumpe.py	\
 	bin/vmsubmit.py	\
 	sbin	\
 	sbin/cpu-temp.sh	\

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# vim: expandtab sw=2 ts=2
+
 """tcpdumpe.py -- dump tcpdump with cheat block in EBCDIC"""
 
 import re
@@ -8,22 +10,22 @@ import sys
 
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 def _Dump(table):
   """Execute tcpdump and process the output."""
   argv = list(sys.argv)
   argv[0] = 'tcpdump'
   print(' '.join(argv))
-  # <tab>	0x0000:  3333 0000 0001 dca6 3202 5864 86dd 600a
+  # <tab>       0x0000:  3333 0000 0001 dca6 3202 5864 86dd 600a
   regex = re.compile(
       r'\s+0x[0123456789abcdef]+:\s+(([0123456789abcdef]+( |$))+)')
 
   proc = subprocess.Popen(argv,
-    			  bufsize=1,
-  			  stdout=subprocess.PIPE,
-			  stderr=subprocess.STDOUT,
-			  text=True) 
+                          bufsize=1,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT,
+                          universal_newlines=True)
   for data in proc.stdout:
     print(data.rstrip(), end='')
     match = regex.match(data)
