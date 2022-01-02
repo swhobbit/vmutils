@@ -21,7 +21,12 @@ Welcome to Kendra Electronic Wonderworks
 |_|\_\ |______|     \/  \/
 
 @SF P
+@SBA 14,1
+@ALIGN CENTER
+Hercules version $(VERSION)
 @SBA 15,1
 @ALIGN CENTER
-Hercules version $(VERSION) on host $(HOSTNAME) (port $(HERCULES_CONSOLE))
+Host $(HOSTNAME) (port $(HERCULES_CONSOLE))
+@SBA 16,1
+@ALIGN CENTER
 Terminal $(CUU) on system $(LPARNAME)
