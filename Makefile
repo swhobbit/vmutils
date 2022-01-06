@@ -24,14 +24,15 @@ binary_files:	\
 	bin	\
 	bin/6to4_tunnel.sh	\
 	bin/datestamp.sh	\
+	bin/hercules-config-kew.sh	\
 	bin/hercules_route_lcs.py	\
 	bin/hercules.sh	\
 	bin/spool.py	\
 	bin/tcpdumpe.py	\
 	bin/vmsubmit.py	\
 	sbin	\
-	sbin/cpu-temp.sh	\
 	sbin/clean-up-backup-disk.sh	\
+	sbin/cpu-temp.sh	\
 	sbin/dump-to-backup-disk.sh
 
 common_files:	common	\
