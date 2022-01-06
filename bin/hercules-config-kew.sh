@@ -196,6 +196,7 @@ if [ "spinhawk" = "${EDITION}" ] ; then
 fi
 
 quoted_build_optimizations="$(awk '{$1=$1;print}' <<< "${build_optimizations[@]}" )"
+<<<<<<< HEAD
 
 # shellcheck disable=SC2086
 echo Build options: "${build_options[@]}" --enable-optimization=\"${quoted_build_optimizations}\" "${@}"
@@ -203,6 +204,11 @@ echo ""
 
 # shellcheck disable=SC2086
 # shellcheck disable=SC2068
+=======
+echo Build options: "${build_options[@]}" --enable-optimization=\"${quoted_build_optimizations}\" "${@}"
+echo ""
+
+>>>>>>> 1d581c1ac2460a3497aae874920249b80c272e80
 time ./configure ${build_options[@]} --enable-optimization="${quoted_build_optimizations}" "${@}" || exit $?
 echo ""
 
