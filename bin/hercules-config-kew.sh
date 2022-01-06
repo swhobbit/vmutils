@@ -52,7 +52,7 @@ build_prefix=/usr/local
 if ${static} ; then
 	CUSTOM_LIB="static_libraries"
 else
-	CUSTOM=LIB="shared_libraries"
+	CUSTOM_LIB="shared_libraries"
 fi
 
 VERSION=$(awk -F"[(,)]" '/^AM_INIT_AUTOMAKE/ {print $3}' configure.ac)
