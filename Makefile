@@ -19,6 +19,7 @@ common/%: ${HOME}/hercules/common/%
 	cp -f "$<" "$@"
 
 all:   	binary_files common_files cron_files
+	git status
 
 binary_files:	\
 	bin	\
