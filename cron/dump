@@ -1,0 +1,10 @@
+# Install as /etc/cron.d/dumpl make sure you have mail configured to
+# get the results sent to you.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/sbin:/opt/local/sbin
+
+
+# Dump select directories every moning at 2:39 AM
+39 2 * * *	root /usr/local/sbin/dump-to-backup-disk.sh
+
+# Since reboots often herald major changes, backup immediately after reboot
+@reboot		root sleep 60  && /usr/local/sbin/dump-to-backup-disk.sh

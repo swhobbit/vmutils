@@ -1,0 +1,40 @@
+sh screen -t console	1	c3270	console@127.0.0.1 ${HERCULES_CONSOLE}
+
+# This assumes logging is started from the command line that Hercules is invoked
+# via
+sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
+
+# If ESA or Z arch and running OS, when SYSCONs goes active make it an
+# active console
+hao tgt HHCCP041I SYSCONS interface active
+hao cmd scp vary cn(*),activate
+
+# Use HASP, not ASP, after MVT clock set
+hao tgt IEE116A
+hao cmd /r 00,auto=n
+
+# Automatically route any TAP network device to the local live subnet
+hao tgt HHCLC055I (tap[0-9]+)
+hao cmd sh hercules_route_lcs.py -d $1 $(HERCULES_NAME).oat
+
+# We run most base disk R/O so the shadow file merge below never wipes the
+# first generation; live updates go into the second generation.
+#
+# Nightly backups are your friend!
+
+sf- *
+pause 5
+sf+ *
+pause 5
+
+ipl $(HERCULES_IPL)
+
+# Run any machine specific commands, like "less" on the MVS log or a pr3287 session.
+sh [ -x hercules.coda.sh ] && ./hercules.coda.sh
+
+# If we have an OAT file which configures a network connection, and
+# the hostname is in DNS, tell the network of the host that the emulated
+# machine is reachable via the host.
+#
+# Assumes Linux simple interface name!
+sh [ -f ${HERCULES_NAME}.oat ] && host ${HERCULES_NAME} | grep -q address && sudo arp -i eth0 -Ds ${HERCULES_NAME} eth0 pub
