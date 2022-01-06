@@ -1,11 +1,39 @@
 #!/usr/bin/env bash
 
-# This script is a shorthand method of running configure with
-# a specific set of options, including a custom version string
-# which indicates the current git branch name and commit count.
-# Copy this file to ./config and edit the options as required.
-# This allows you to specify your own site-specific prefix and
-# other preferences in a file not tracked by git.
+#                            BUILD SH
+#                      hercules-config-kew.sh
+#
+#            Perform customized optiimized build for hercules of a Rasperry Pi
+#
+#               Date: 5 Jan 2022
+#             Author: ahd@kew.com (Drew Derbyshire)
+#            Address: Kendra Electronic Wonderworks
+#                     Kenmore, WA
+
+#	This script is a shorthand method of running configure with a
+#	specific set of options, including a custom version string which
+#	indicates the current git branch name and commit count.
+
+#	Things this does:
+#	- Passes any command line arguments directly to ./configure
+#	- Delivers the binaries to directories under /usr/local/spimhawk or
+#	  /use/local/hyerpion
+#	- Use clang-9, clang, or gcc in that order.
+#	- Allows (subject o te actual build support) to shared (dymanic) or static
+#	  libraries.
+#	- For ARM processor builds under Linux Optimizes the build according to
+#	  the Raspberry Pi reported.
+#	- Run paraellal make for the number of processors reported on the system.
+
+#    This should work on a X86 running Linux, but no special optimizations are
+#	done.
+
+#	To use, switch to the root directory of the source respository, and run
+#	this command.
+
+#	Copy this file to ./config and edit the options as required.
+#	This allows you to specify your own site-specific prefix and
+#	other preferences in a file not tracked by git.
 
 git status  > /dev/null
 RC=${?}
@@ -217,5 +245,11 @@ sed	\
 time make clean || exit $?
 echo ""
 
-time make -j 4
+if [ -x /usr/bin/nproc ] ; then
+	make_opt="-j $(nproc)"
+else
+	make_opt=""
+fi
+
+time make ${make_opt}
 exit $?
