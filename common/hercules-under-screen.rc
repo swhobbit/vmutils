@@ -10,8 +10,13 @@ hao tgt HHCCP041I SYSCONS interface active
 hao cmd scp vary cn(*),activate
 
 # Use HASP, not ASP, after MVT clock set
-hao tgt IEE116A
+hao tgt IEE114A
 hao cmd /r 00,auto=n
+
+# Vary MVS console online if no master console found (mostly seen on
+# slow host systems at start up). Must use CONSOLE and not MSTCONS
+hao tgt IEE141A MASTER AND ALL ALTERNATES UNAVAILABLE
+hao cmd /V 010,CONSOLE
 
 # Automatically route any TAP network device to the local live subnet
 hao tgt HHCLC055I (tap[0-9]+)
@@ -38,3 +43,9 @@ sh [ -x hercules.coda.sh ] && ./hercules.coda.sh
 #
 # Assumes Linux simple interface name!
 sh [ -f ${HERCULES_NAME}.oat ] && host ${HERCULES_NAME} | grep -q address && sudo arp -i eth0 -Ds ${HERCULES_NAME} eth0 pub
+
+sleep 5
+
+# Must be after IPL and printer is opened.
+sh screen -t syslog        3       less +F -S -I log/syslog-${HERCULES_NAME}.log
+
