@@ -4,6 +4,10 @@ sh screen -t console	1	c3270	console@127.0.0.1 ${HERCULES_CONSOLE}
 # via
 sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
 
+# Must be after IPL and printer is opened.
+hao tgt HHCPR007I.+030E
+hao cmd sh sleep 5 && screen -t syslog        3       less +F -S -I log/syslog-${HERCULES_NAME}.log
+
 # If ESA or Z arch and running OS, when SYSCONs goes active make it an
 # active console
 hao tgt HHCCP041I SYSCONS interface active
@@ -43,9 +47,3 @@ sh [ -x hercules.coda.sh ] && ./hercules.coda.sh
 #
 # Assumes Linux simple interface name!
 sh [ -f ${HERCULES_NAME}.oat ] && host ${HERCULES_NAME} | grep -q address && sudo arp -i eth0 -Ds ${HERCULES_NAME} eth0 pub
-
-sleep 5
-
-# Must be after IPL and printer is opened.
-sh screen -t syslog        3       less +F -S -I log/syslog-${HERCULES_NAME}.log
-
