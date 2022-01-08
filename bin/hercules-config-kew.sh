@@ -182,7 +182,6 @@ else
 			"-mcpu=cortex-a72"
 			"-mtune=cortex-a72"
 			"-mfpu=neon-fp-armv8"
-			"-mtune=cortex-a72"
 		)
 		gcc_build_optimizations=(
 			"${gcc_build_optimizations[@]}"
