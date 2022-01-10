@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-#                            BUILD SH
 #                      hercules-config-kew.sh
 #
-#            Perform customized optiimized build for hercules of a Rasperry Pi
+#            Perform customized optiimized build for hercules of a
+#            Rasperry Pi
 #
 #               Date: 5 Jan 2022
 #             Author: ahd@kew.com (Drew Derbyshire)
@@ -19,21 +19,27 @@
 #	- Delivers the binaries to directories under /usr/local/spimhawk or
 #	  /use/local/hyerpion
 #	- Use clang-9, clang, or gcc in that order.
-#	- Allows (subject o te actual build support) to shared (dymanic) or static
-#	  libraries.
-#	- For ARM processor builds under Linux Optimizes the build according to
-#	  the Raspberry Pi reported.
-#	- Run paraellal make for the number of processors reported on the system.
+#	- For ARM processor builds under Linux, optimizes the build according
+#	  to the Raspberry Pi model reported.
+#	- Run parallel make for the number of processors reported on the
+#	  system.
 
-#    This should work on a X86 running Linux, but no special optimizations are
+#	This should work on a X86 running Linux, but no special optimizations are
 #	done.
 
 #	To use, switch to the root directory of the source respository, and run
 #	this command.
 
-#	Copy this file to ./config and edit the options as required.
-#	This allows you to specify your own site-specific prefix and
-#	other preferences in a file not tracked by git.
+#	Copy this file to ./config (or run from outside the tree) and edit,
+#	the options as required. This allows you to specify your own
+#	site-specific prefix and other preferences in a file not tracked by
+#       git.
+
+#	For Hercules Spinhawk builds, see also:
+#	https://github.com/rbowler/spinhawk
+
+#	For Hercules SDL Hyperion builds, see also:
+#	https://sdl-hercules-390.github.io/html/hercinst.html#instsource
 
 git status  > /dev/null
 RC=${?}
@@ -73,21 +79,13 @@ fi
 
 
 silent=				#	--silent
-static=false		# 	static=true may not work with some of versions Hercules!
 build_prefix=/usr/local
-
-# Static may not work with some versions of Hercules!
-if ${static} ; then
-	CUSTOM_LIB="static_libraries"
-else
-	CUSTOM_LIB="shared_libraries"
-fi
 
 VERSION=$(awk -F"[(,)]" '/^AM_INIT_AUTOMAKE/ {print $3}' configure.ac)
 BUILT_LOCATION="${LOGNAME}@$(hostname):$(pwd)"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 COMMIT_COUNT="$(wc -l <<< "$(git log --oneline)" )"
-CUSTOM="${BUILT_LOCATION}-${VERSION}-${CUSTOM_LIB}-${BRANCH}-${COMMIT_COUNT}"
+CUSTOM="${BUILT_LOCATION}-${VERSION}-${BRANCH}-${COMMIT_COUNT}"
 
 build_prefix="${build_prefix}/${EDITION}"
 
@@ -117,15 +115,6 @@ build_optimizations=(
 gcc_build_optimizations=(
 	"-frename-registers"
 	)
-
-# Static libraries may not work with some versions of Hercules!
-if ${static} ; then
-	build_options=(
-		"${build_options[@]}"
-	 	--enable-static
-	 	--disable-shared
-	)
-fi
 
 if [ "hyperion" = "${EDITION}" ] ; then
 	build_options=(
@@ -234,6 +223,7 @@ time ./configure ${build_options[@]} --enable-optimization="${quoted_build_optim
 echo ""
 
 # Prevent libtool from failing the build because of its own brain damage
+# Suggested by https://hercules-390.groups.io/g/group/message/881
 sed	\
 	-i.bak	\
 	-E	\
@@ -250,5 +240,8 @@ else
 	make_opt=""
 fi
 
-time make ${make_opt}
-exit $?
+time make ${make_opt} || exit $?
+
+echo ""
+echo Do not forget to run \"sudo make install\" to put the binaries into
+echo ${build_prefix}/bin and to add directory that to your path.
