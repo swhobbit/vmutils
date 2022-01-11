@@ -130,7 +130,9 @@ for entry in	\
 	etc	\
 	export	\
 	home	\
+	opt/local/etc	\
 	usr/local/bin	\
+	usr/local/etc	\
 	usr/local/home	\
 	usr/local/sbin	\
 	var/www
