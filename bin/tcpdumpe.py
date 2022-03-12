@@ -27,16 +27,18 @@ def _Dump(table):
                           stderr=subprocess.STDOUT,
                           universal_newlines=True)
   for data in proc.stdout:
-    print(data.rstrip(), end='')
     match = regex.match(data)
     if match:
+      print("{:67}".format(data.rstrip()), end='')
       digits = match.group(1).replace(' ', '')
       print('\t', end='', sep='')
       for i in range(0, len(digits), 2):
         byte = digits[i:i+2]
         byte = table[int(byte, 16)]
         print(byte, sep='', end='')
-    print()
+      print()
+    else:
+      print(data)
 
 def _MakeTranslateTable():
   """Build an ASCII to EBCDIC translation table."""
