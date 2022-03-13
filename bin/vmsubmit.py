@@ -74,7 +74,7 @@ def _ParseCommandLine(command_line):
       help='Transmit the file which is already in EBCDIC, '
       'using the EBCDIC port or UTF mode E as specified '
       '(generated header records are translated to EBCDIC as required) '
-      '(Default: %(default)s, except for files of type VMARC, '
+      '(Default: %(default)s, except for files of type VMARC or XMI, '
       'which are always in EBCDIC)',
   )
   parser.add_argument(
@@ -252,7 +252,7 @@ def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
     ftype = vm_file_name[1][0:8]
   fmode = keyword_arguments['filemode'][0:2]
 
-  is_ebcdic = keyword_arguments['ebcdic'] or ftype == 'VMARC'
+  is_ebcdic = keyword_arguments['ebcdic'] or ftype in ('VMARC', 'XMI')
   is_uft = 'uft_host' in keyword_arguments
 
   if is_ebcdic and length % 80:
