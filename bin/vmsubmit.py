@@ -13,13 +13,19 @@ import socket
 import sys
 import time
 
-__version__ = '1.1.2'
+__version__ = '1.2.0'
 __author__ = 'ahd@kew.com (Andrew H. Derbyshire)'
-__copyright__ = ('Copyright 2018-2021 by Kendra Electronic Wonderworks.  '
+__copyright__ = ('Copyright 2018-2022 by Kendra Electronic Wonderworks.  '
                  'All commercial rights reserved.\n'
                  'Version ' + __version__)
 
 TRANSLATE_TABLE = None
+
+ASCII_READER_DEFAULT_PORT = int(os.getenv('HERCULES_ASCII_READER',
+                                          default='14425'))
+EBCDIC_READER_DEFAULT_PORT = int(os.getenv('HERCULES_EBCDIC_READER',
+                                           default='254025'))
+UFT_DEFAULT_PORT = 608
 
 def _ParseCommandLine(command_line):
   """Parse program arguments"""
@@ -39,11 +45,17 @@ def _ParseCommandLine(command_line):
       'protocol as (incompletely) defined in RFC 1440.',
       epilog=__copyright__
   )
+  exclusive_port_flags = parser.add_mutually_exclusive_group()
+  parser.add_argument(
+      '-v',
+      '--version',
+      action='version',
+      version='%(prog)s ' + __version__)
   parser.add_argument(
       '-l',
       '--login',
       default=str.upper(getpass.getuser()),
-      help='VM user login id to send file to '
+      help='User login id to send file to '
       '(Default: %(default)s)',
       type=str.upper,
   )
@@ -51,60 +63,13 @@ def _ParseCommandLine(command_line):
       '-H',
       '--host',
       default='hercules',
-      help='The hostname of the server to submit file to '
+      help='The TCP/IP hostname of the server to connect to; '
+      'files are delivered to '
+      'the specified login on this host unless the UFT or RCSCS options '
+      'are specified '
       '(Default: %(default)s)',
       type=socket.gethostbyname,
   )
-  parser.add_argument(
-      '-u',
-      '--uft_host',
-      default=argparse.SUPPRESS,
-      metavar='VM_HOST',
-      help='Request the file be sent using the UFT protocol, '
-      'specifying '
-      'the hostname of the UTF server '
-      'to send the file via ',
-      type=str.upper,
-  )
-  parser.add_argument(
-      '-e',
-      '--ebcdic',
-      default=False,
-      action='store_true',
-      help='Transmit the file which is already in EBCDIC, '
-      'using the EBCDIC port or UTF mode E as specified '
-      '(generated header records are translated to EBCDIC as required) '
-      '(Default: %(default)s, except for files of type VMARC or XMI, '
-      'which are always in EBCDIC)',
-  )
-  parser.add_argument(
-      '-p',
-      '--port_ascii',
-      default=os.getenv('HERCULES_ASCII_READER', default='14425'),
-      metavar='APORT',
-      help='Port number of reader on host for ASCII files '
-      '(Default: %(default)s)',
-      type=_PositiveInteger,
-  )
-  parser.add_argument(
-      '-P',
-      '--port_ebcdic',
-      metavar='EPORT',
-      default=os.getenv('HERCULES_EBCDIC_READER', default='25405'),
-      help='Port number of reader on host for EBCDIC files '
-      '(Default: %(default)s)',
-      type=_PositiveInteger,
-  )
-  parser.add_argument(
-      '-U',
-      '--port_uft',
-      metavar='UPORT',
-      default=608,
-      help='Port number to send UTF/SIFT files via '
-      '(Default: %(default)s)',
-      type=_PositiveInteger,
-  )
-
   parser.add_argument(
       '-t',
       '--filetype_default',
@@ -123,6 +88,74 @@ def _ParseCommandLine(command_line):
       help='Filemode (class) to spool file as '
       '(Default: %(default)s)',
       type=str.upper,
+  )
+  parser.add_argument(
+      '-e',
+      '--ebcdic',
+      default=False,
+      action='store_true',
+      help='Transmit the file (which must already be in EBCDIC), '
+      'using the EBCDIC reader port or UTF mode E as specified '
+      '(generated header records are translated to EBCDIC as required) '
+      '(Default: %(default)s, except for files of type VMARC or XMI, '
+      'which are always in EBCDIC)',
+  )
+  parser.add_argument(
+      '-u',
+      '--uft',
+      default=False,
+      action='store_true',
+      help='Connect to the specified UFT port on the TCP/IP server '
+      'rather than to a reader port, '
+      'and use the UFT protocol to send the file. '
+      '(Default: %(default)s)'
+  )
+  parser.add_argument(
+      '-r',
+      '--remote_node',
+      default=None,
+      metavar='RSCS_NODE',
+      help='Specify the RSCS node name that the file is to be sent to '
+      'after receipt on the TCP/IP server host.'
+      '(Default: %(default)s)',
+      type=str.upper,
+  )
+  parser.add_argument(
+      '-R',
+      '--rscs_vm',
+      default='RSCS',
+      metavar='RSCS_VM',
+      help='User id of the RSCS virtual machine to spool files via'
+      'to transmit. '
+      '(Default: %(default)s)',
+      type=str.upper,
+  )
+  exclusive_port_flags.add_argument(
+      '-A',
+      '--port_ascii',
+      default=ASCII_READER_DEFAULT_PORT,
+      metavar='APORT',
+      help='TCP port number of reader on host for ASCII files '
+      '(Default: %(default)s)',
+      type=_PositiveInteger,
+  )
+  exclusive_port_flags.add_argument(
+      '-E',
+      '--port_ebcdic',
+      metavar='EPORT',
+      default=EBCDIC_READER_DEFAULT_PORT,
+      help='TCP port number of reader on host for EBCDIC files '
+      '(Default: %(default)s)',
+      type=_PositiveInteger,
+  )
+  exclusive_port_flags.add_argument(
+      '-U',
+      '--port_uft',
+      metavar='UPORT',
+      default=UFT_DEFAULT_PORT,
+      help='TCP port number to send UTF/SIFT files via '
+      '(Default: %(default)s)',
+      type=_PositiveInteger,
   )
   parser.add_argument(
       '-s',
@@ -203,19 +236,34 @@ def _UftPrologue(login,              # pylint: disable=R0913
   _Expect(network_socket, 'DATA {:d}'.format(length), http.HTTPStatus.CREATED)
 
 
-def _ReaderPrologue(login,
-                    fname,
-                    ftype,
-                    fmode,
+def _ReaderPrologue(remote_node,
+                    login,
+                    filename,
                     date,
                     is_ebcdic,
+                    rscs_vm,
                     network_socket):
   """Generate Header records for a submission to the VM reader"""
-  id_card = 'USERID {:8s} CLASS {:1s} NAME {:8s} {:2s}'.format(
-      login,
-      fmode[0:1],
-      fname[0:8],
-      ftype[0:8])
+  fname, ftype, fmode = filename
+  if remote_node:
+    # Remote user via RSCS
+    id_card = 'USERID {:8s} CLASS {:1s} NAME {:8s} {:2s}'.format(
+        rscs_vm,
+        fmode[0:1],
+        fname[0:8],
+        ftype[0:8])
+    tag_card = '{:8s} {:8s}'.format(
+        remote_node,
+        login)
+  else:
+    # Local user
+    id_card = 'USERID {:8s} CLASS {:1s} NAME {:8s} {:2s}'.format(
+        login,
+        fmode[0:1],
+        fname[0:8],
+        ftype[0:8])
+    tag_card = None
+
   # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
   read_card = ':READ {:8s} {:8s} {:2s} {:6s} {:17s}'.format(
       fname[0:8],
@@ -225,18 +273,16 @@ def _ReaderPrologue(login,
       date,
       )
 
-  if is_ebcdic:
-    id_card = '{:80}'.format(id_card).translate(TRANSLATE_TABLE)
-    read_card = '{:80}'.format(read_card).translate(TRANSLATE_TABLE)
-  else:
-    id_card += '\n'
-    read_card += '\n'
-
-  _Send(network_socket, id_card)
-  _Send(network_socket, read_card)
+  for card in (id_card, tag_card, read_card):
+    if card:
+      if is_ebcdic:
+        card = '{:80}'.format(card).translate(TRANSLATE_TABLE)
+      else:
+        card = card + '\n'
+      _Send(network_socket, card)
 
 
-def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
+def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
   """Send a single file to VM, prefixed by USERID and READ cards."""
   full_name = path.abspath(path.expanduser(file_path))
   length = path.getsize(full_name)
@@ -247,13 +293,15 @@ def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
                                                       '$').upper().split('.')
   fname = vm_file_name[0]
   if len(vm_file_name) == 1:
-    ftype = keyword_arguments['filetype_default']
+    ftype = keywords['filetype_default']
   else:
     ftype = vm_file_name[1][0:8]
-  fmode = keyword_arguments['filemode'][0:2]
+  fmode = keywords['filemode'][0:2]
 
-  is_ebcdic = keyword_arguments['ebcdic'] or ftype in ('VMARC', 'XMI')
-  is_uft = 'uft_host' in keyword_arguments
+  is_ebcdic = keywords['ebcdic'] or ftype in ('VMARC', 'XMI')
+  is_ebcdic = is_ebcdic or keywords['port_ebcdic'] != EBCDIC_READER_DEFAULT_PORT
+
+  is_uft = keywords['uft'] or keywords['port_uft'] != UFT_DEFAULT_PORT
 
   if is_ebcdic and length % 80:
     error = 'Length of file {:s} is not a multiple of 80, it is {:d}'.format(
@@ -262,11 +310,11 @@ def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
 
   if is_ebcdic:
     print('File', fname, ftype, 'is EBCDIC')
-    port = keyword_arguments['port_ebcdic']
+    port = keywords['port_ebcdic']
     file_handle = open(full_name, 'rb')
   else:
     print('File', fname, ftype, 'is ASCII')
-    port = keyword_arguments['port_ascii']
+    port = keywords['port_ascii']
     file_handle = open(full_name, 'rt', encoding='utf-8')
 
   data_buffer = file_handle.read()
@@ -281,15 +329,15 @@ def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
       data_buffer = data_buffer.replace('\n', '\r\n')
       print('Opening UFT host {:s} port {:d} for user '
             '{:s} file {:s} {:s}'.format(
-                keyword_arguments['host'],
-                keyword_arguments['port_uft'],
-                keyword_arguments['login'],
+                keywords['host'],
+                keywords['port_uft'],
+                keywords['login'],
                 fname,
                 ftype))
-      network_socket = socket.create_connection((keyword_arguments['host'],
-                                                 keyword_arguments['port_uft']))
-      _UftPrologue(keyword_arguments['login'],
-                   keyword_arguments['uft_host'],
+      network_socket = socket.create_connection((keywords['host'],
+                                                 keywords['port_uft']))
+      _UftPrologue(keywords['login'],
+                   keywords['remote_node'],
                    fname,
                    ftype,
                    len(data_buffer),
@@ -299,20 +347,20 @@ def _ProcessFile(file_path, keyword_arguments):   # pylint: disable=R0914
     else:
       print('Opening reader on host {:s} port {:d} for user '
             '{:s} file {:s} {:s} {:s}'.format(
-                keyword_arguments['host'],
+                keywords['host'],
                 port,
-                keyword_arguments['login'],
+                keywords['login'],
                 fname,
                 ftype,
                 fmode))
       network_socket = socket.create_connection(
-          (keyword_arguments['host'], port))
-      _ReaderPrologue(keyword_arguments['login'],
-                      fname,
-                      ftype,
-                      fmode,
+          (keywords['host'], port))
+      _ReaderPrologue(keywords['remote_node'],
+                      keywords['login'],
+                      (fname, ftype, fmode),
                       date,
                       is_ebcdic,
+                      keywords['rscs_vm'],
                       network_socket)
 
     _Send(network_socket, data_buffer)
@@ -427,7 +475,7 @@ def _MakeTranslateTable():
       '>':0x6E,
       '?':0x6F,
       ' ':0x40,
-      u'¬':0x5F,                              # '¬' is Unicode
+      '¬':0x5F,                              # '¬' is Unicode
   }
   for key, value in translate_map.items():
     result[ord(key)] = chr(value)
@@ -439,16 +487,16 @@ def _Main():
   args = _ParseCommandLine(sys.argv[1:])
   global TRANSLATE_TABLE                # pylint: disable=W0603
   TRANSLATE_TABLE = _MakeTranslateTable()
-  keyword_arguments = vars(args)
+  keywords = vars(args)
   first = True
   for current in args.file:
     if not first:
       # Allow Hercules side networking/IO to catch up, else it may get
       # rejected by hercules (which reports no error back to us!).
-      time.sleep(keyword_arguments['sleep'])
+      time.sleep(keywords['sleep'])
     first = False
 
-    _ProcessFile(current, keyword_arguments)
+    _ProcessFile(current, keywords)
 
 if __name__ == '__main__':
   sys.exit(_Main())
