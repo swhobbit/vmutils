@@ -1,17 +1,31 @@
-sh screen -t console	1	c3270	console@127.0.0.1 ${HERCULES_CONSOLE}
+sh screen -t console	1	c3270	-model 2 console@127.0.0.1 ${HERCULES_CONSOLE}
 
 # This assumes logging is started from the command line that Hercules is invoked
 # via
 sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
 
+# Must be after IPL and printer is opened.
+hao tgt HHCPR007I.+030E
+hao cmd sh sleep 5 && screen -t syslog        3       less +F -S -I log/syslog-${HERCULES_NAME}.log
+
 # If ESA or Z arch and running OS, when SYSCONs goes active make it an
 # active console
-hao tgt HHCCP041I SYSCONS interface active
-hao cmd scp vary cn(*),activate
+hao tgt (HHCCP041I SYSCONS|HHC00006I SCLP console) interface active
+hao cmd . vary cn(*),activate
 
 # Use HASP, not ASP, after MVT clock set
-hao tgt IEE116A
+hao tgt IEE114A
 hao cmd /r 00,auto=n
+
+# Vary MVS console online if no master console found (mostly seen on
+# slow host systems at start up). Must use CONSOLE and not MSTCONS
+hao tgt IEE141A MASTER AND ALL ALTERNATES UNAVAILABLE
+hao cmd /V 010,CONSOLE
+
+# If we lose the syslog, route the log to the printer log. 
+# (Doesn't work because of non-master console authority issues.)
+hao tgt IEE143I  01F NOW RECEIVING HARDCOPY, REASON=HCSW
+hao cmd /V 30E,HARDCPY
 
 # Automatically route any TAP network device to the local live subnet
 hao tgt HHCLC055I (tap[0-9]+)
