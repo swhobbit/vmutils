@@ -13,7 +13,7 @@ import socket
 import sys
 import time
 
-__version__ = '1.1.3'
+__version__ = '1.2.0'
 __author__ = 'ahd@kew.com (Andrew H. Derbyshire)'
 __copyright__ = ('Copyright 2018-2022 by Kendra Electronic Wonderworks.  '
                  'All commercial rights reserved.\n'
