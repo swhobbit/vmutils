@@ -13,33 +13,49 @@ import socket
 import sys
 import time
 
-__version__ = '1.2.0'
+__version__ = '1.2.3'
 __author__ = 'ahd@kew.com (Andrew H. Derbyshire)'
-__copyright__ = ('Copyright 2018-2022 by Kendra Electronic Wonderworks.  '
+__copyright__ = ('Version ' + __version__ + '. '
+                 'Copyright 2018-2022 by Kendra Electronic Wonderworks.  '
                  'All commercial rights reserved.\n'
-                 'Version ' + __version__)
+                 )
 
 TRANSLATE_TABLE = None
 
 ASCII_READER_DEFAULT_PORT = int(os.getenv('HERCULES_ASCII_READER',
                                           default='14425'))
 EBCDIC_READER_DEFAULT_PORT = int(os.getenv('HERCULES_EBCDIC_READER',
-                                           default='254025'))
+                                           default='25405'))
 UFT_DEFAULT_PORT = 608
 
 def _ParseCommandLine(command_line):
   """Parse program arguments"""
 
   def _PositiveInteger(value):
-    """Convert passed value to a postive integer and verify it."""
+    """Convert passed value to a positive integer and verify it."""
     ivalue = int(value)
     if ivalue <= 0:
       raise argparse.ArgumentTypeError(
-          '%s is an invalid positive int value' % value)
+          '%s is not a positive int value' % value)
+    return ivalue
+
+  def _StringToken(value):
+    """Convert passed value to an uppper case string and verify it."""
+    ivalue = value.upper()
+    if not value:
+      raise argparse.ArgumentTypeError(
+          'String argument is empty' % value)
+    if ' ' in value:
+      raise argparse.ArgumentTypeError(
+          '"%s" contains spaces' % value)
+    if len(value) > 8:
+      raise argparse.ArgumentTypeError(
+          '"%s" is longer than eight characters' % value)
     return ivalue
 
   parser = argparse.ArgumentParser(
-      description='Transmit a file to a user on VM either via '
+      description='Transmit a file to a user on VM '
+      '(or connected via a VM system) either via '
       'a networked emulated system reader (the default) or '
       'via the Sender-Initiated/Unsolicited File Transfer (SIFT/UFT) '
       'protocol as (incompletely) defined in RFC 1440.',
@@ -57,7 +73,7 @@ def _ParseCommandLine(command_line):
       default=str.upper(getpass.getuser()),
       help='User login id to send file to '
       '(Default: %(default)s)',
-      type=str.upper,
+      type=_StringToken,
   )
   parser.add_argument(
       '-H',
@@ -75,10 +91,10 @@ def _ParseCommandLine(command_line):
       '--filetype_default',
       metavar='FT',
       default='DATA',
-      help='Filetype to add to the name on VM '
-      'if the local file name has no usable extension '
+      help='Filetype to add to the name '
+      'if the local file name has no usable extension. '
       '(Default: %(default)s)',
-      type=str.upper,
+      type=_StringToken,
   )
   parser.add_argument(
       '-m',
@@ -87,22 +103,24 @@ def _ParseCommandLine(command_line):
       metavar='FM',
       help='Filemode (class) to spool file as '
       '(Default: %(default)s)',
-      type=str.upper,
+      type=_StringToken,
   )
   parser.add_argument(
       '-e',
       '--ebcdic',
+      '--binary',
       default=False,
       action='store_true',
       help='Transmit the file (which must already be in EBCDIC), '
-      'using the EBCDIC reader port or UTF mode E as specified '
-      '(generated header records are translated to EBCDIC as required) '
-      '(Default: %(default)s, except for files of type VMARC or XMI, '
-      'which are always in EBCDIC)',
+      'via the EBCDIC reader port or UTF mode E '
+      '(Default: %(default)s, except this option is automatically enabled '
+      'for files of type VMARC and XMI, '
+      'which are always in EBCDIC.)'
   )
   parser.add_argument(
       '-u',
       '--uft',
+      dest='is_uft',
       default=False,
       action='store_true',
       help='Connect to the specified UFT port on the TCP/IP server '
@@ -111,31 +129,47 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)'
   )
   parser.add_argument(
+      '-o',
+      '--os',
+      '--mvs',
+      dest='is_os',
+      default=False,
+      action='store_true',
+      help='The target system is running OS/360 (or a successor), not VM.  '
+      'To avoid mucking things up on such a system, '
+      'no VM READ header card will preface the file. '
+      '(Default: %(default)s, '
+      'except that this option is automatically enabled for '
+      'remote systems with MVS in their name '
+      'and for files of type XMI, JCL, or JOB.)'
+  )
+  parser.add_argument(
       '-r',
       '--remote_node',
       default=None,
-      metavar='RSCS_NODE',
-      help='Specify the RSCS node name that the file is to be sent to '
-      'after receipt on the TCP/IP server host.'
-      '(Default: %(default)s)',
-      type=str.upper,
+      metavar='REMOTE_NODE',
+      help='The node name that the file is forwarded to via RSCS '
+      'after receipt on the TCP/IP server host. '
+      '(Default: %(default)s, that is deliver to the local host.)',
+      type=_StringToken,
   )
   parser.add_argument(
       '-R',
       '--rscs_vm',
       default='RSCS',
       metavar='RSCS_VM',
-      help='User id of the RSCS virtual machine to spool files via'
-      'to transmit. '
+      help='When forwarding to a remote node, '
+      'the user id of the RSCS virtual machine to send files via. '
       '(Default: %(default)s)',
-      type=str.upper,
+      type=_StringToken,
   )
   exclusive_port_flags.add_argument(
       '-A',
       '--port_ascii',
       default=ASCII_READER_DEFAULT_PORT,
       metavar='APORT',
-      help='TCP port number of reader on host for ASCII files '
+      help='The TCP port number of the reader for ASCII '
+      'files on the TCP/IP server host. '
       '(Default: %(default)s)',
       type=_PositiveInteger,
   )
@@ -144,7 +178,8 @@ def _ParseCommandLine(command_line):
       '--port_ebcdic',
       metavar='EPORT',
       default=EBCDIC_READER_DEFAULT_PORT,
-      help='TCP port number of reader on host for EBCDIC files '
+      help='The TCP port number of the reader for EBCDIC'
+      ' files on the TCP/IP server host. '
       '(Default: %(default)s)',
       type=_PositiveInteger,
   )
@@ -153,7 +188,7 @@ def _ParseCommandLine(command_line):
       '--port_uft',
       metavar='UPORT',
       default=UFT_DEFAULT_PORT,
-      help='TCP port number to send UTF/SIFT files via '
+      help='The TCP port number to send UTF/SIFT files via. '
       '(Default: %(default)s)',
       type=_PositiveInteger,
   )
@@ -236,42 +271,53 @@ def _UftPrologue(login,              # pylint: disable=R0913
   _Expect(network_socket, 'DATA {:d}'.format(length), http.HTTPStatus.CREATED)
 
 
-def _ReaderPrologue(remote_node,
-                    login,
+def _ReaderPrologue(keywords,
                     filename,
                     date,
                     is_ebcdic,
-                    rscs_vm,
                     network_socket):
   """Generate Header records for a submission to the VM reader"""
   fname, ftype, fmode = filename
-  if remote_node:
+
+  is_os = keywords['is_os']
+  if keywords['remote_node'] and 'MVS' in keywords['remote_node']:
+      is_os = True
+  elif ftype in ('JCL', 'JOB', 'XMI'):
+      is_os = True
+
+  if is_os:
+    print('Processsing {:s} {:s} {:s} in MVS mode.'.format(fname, ftype, fmode))
+
+  if keywords['remote_node']:
     # Remote user via RSCS
     id_card = 'USERID {:8s} CLASS {:1s} NAME {:8s} {:2s}'.format(
-        rscs_vm,
+        keywords['rscs_vm'],
         fmode[0:1],
         fname[0:8],
         ftype[0:8])
     tag_card = '{:8s} {:8s}'.format(
-        remote_node,
-        login)
+        keywords['remote_node'],
+        keywords['login'])
   else:
     # Local user
     id_card = 'USERID {:8s} CLASS {:1s} NAME {:8s} {:2s}'.format(
-        login,
+        keywords['login'],
         fmode[0:1],
         fname[0:8],
         ftype[0:8])
     tag_card = None
 
-  # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
-  read_card = ':READ {:8s} {:8s} {:2s} {:6s} {:17s}'.format(
-      fname[0:8],
-      ftype[0:8],
-      fmode[0:2],
-      socket.gethostname().upper().split('.')[0][0:6],
-      date,
-      )
+  if is_os:
+    read_card = None
+  else:
+    # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
+    read_card = ':READ {:8s} {:8s} {:2s} {:6s} {:17s}'.format(
+        fname[0:8],
+        ftype[0:8],
+        fmode[0:2],
+        socket.gethostname().upper().split('.')[0][0:6],
+        date,
+        )
 
   for card in (id_card, tag_card, read_card):
     if card:
@@ -301,7 +347,7 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
   is_ebcdic = keywords['ebcdic'] or ftype in ('VMARC', 'XMI')
   is_ebcdic = is_ebcdic or keywords['port_ebcdic'] != EBCDIC_READER_DEFAULT_PORT
 
-  is_uft = keywords['uft'] or keywords['port_uft'] != UFT_DEFAULT_PORT
+  is_uft = keywords['is_uft'] or keywords['port_uft'] != UFT_DEFAULT_PORT
 
   if is_ebcdic and length % 80:
     error = 'Length of file {:s} is not a multiple of 80, it is {:d}'.format(
@@ -355,12 +401,10 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
                 fmode))
       network_socket = socket.create_connection(
           (keywords['host'], port))
-      _ReaderPrologue(keywords['remote_node'],
-                      keywords['login'],
+      _ReaderPrologue(keywords,
                       (fname, ftype, fmode),
                       date,
                       is_ebcdic,
-                      keywords['rscs_vm'],
                       network_socket)
 
     _Send(network_socket, data_buffer)
