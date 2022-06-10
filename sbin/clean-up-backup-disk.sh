@@ -8,6 +8,7 @@ MIN_DAYS_TO_DELETE_AFTER=100
 DAYS_TO_DELETE_AFTER=365
 FULL_WEEKLY_DAYS_TO_DELETE_AFTER=90
 DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER=30
+CLEANED=false
 
 # Percentage in use above which we start deleting ALL oldest backups
 HIGH_WATER_PERCENT_IN_USE=90
@@ -73,37 +74,46 @@ else
 	exit 99
 fi
 
-# Determine if we have any backups
+# Determine if we have ANY backups
 ls ${BACKUP_DIRECTORY}/dump-*-full.tgz 2>/dev/null > /dev/null
 if [ 0 -ne $? ] ; then
 	log_error "No backup found with name matching ${BACKUP_DIRECTORY}/dump-*-full.tgz"
 	exit 2
 fi
 
-# Clean up moderately old weekly backups of all types (leaving monthly)
-log_notice "Deleting weekly backups older than ${FULL_WEEKLY_DAYS_TO_DELETE_AFTER} days"
-find	\
-	${BACKUP_DIRECTORY}	\
-	-type f 	\
-	-name 'dump-*.tgz'	\
-	! -name 'dump-*-????-??-0[1-7]_*.tgz'	\
-	-mtime +${FULL_WEEKLY_DAYS_TO_DELETE_AFTER}	\
-	-ls	\
-	-delete	\
-	| sort -k 11
-echo ''
+# Do monthly optional clean up; if we're truly low on space when we are
+# not doing this clean up, some of these files may get scrubbed anywayc
+# below.
+if [ "$(date +%d)" -le 7 ] ; then
 
-# Clean up moderately old differential backups (leaving full)
-log_notice "Deleting differential backups older than ${DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER} days"
-find	\
-	${BACKUP_DIRECTORY}	\
-	-type f 	\
-	-name 'dump-*-diff.tgz'	\
-	-mtime +${DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER}	\
-	-ls	\
-	-delete	\
-	| sort -k 11
-echo ''
+	# Clean up moderately old weekly backups of all types (leaving monthly)
+	log_notice "Deleting weekly backups older than ${FULL_WEEKLY_DAYS_TO_DELETE_AFTER} days"
+	find	\
+		${BACKUP_DIRECTORY}	\
+		-type f 	\
+		-name 'dump-*.tgz'	\
+		! -name 'dump-*-????-??-0[1-7]_*.tgz'	\
+		-mtime +${FULL_WEEKLY_DAYS_TO_DELETE_AFTER}	\
+		-ls	\
+		-delete	\
+		| sort -k 11
+	echo ''
+
+	# Clean up moderately old differential backups (leaving full)
+	log_notice "Deleting differential backups older than ${DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER} days"
+	find	\
+		${BACKUP_DIRECTORY}	\
+		-type f 	\
+		-name 'dump-*-diff.tgz'	\
+		-mtime +${DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER}	\
+		-ls	\
+		-delete	\
+		| sort -k 11
+	echo ''
+
+	CLEANED=true
+
+fi
 
 # Determine date of oldest full backup
 OLDEST_DUMP_FILE="`ls -rt ${BACKUP_DIRECTORY}/dump-*-full.tgz | fmt -1 | head -1`"
@@ -137,9 +147,14 @@ done
 
 if $first_pass ; then
 	log_notice "No backups deleted for space from ${BACKUP_DIRECTORY}."
+else
+	CLEANED=true
 fi
 
-fstrim -v ${BACKUP_DIRECTORY}
+
+if "${CLEANED}" ; then
+	fstrim -v ${BACKUP_DIRECTORY}
+fi
 
 echo ' '
 df -h ${BACKUP_DIRECTORY}
