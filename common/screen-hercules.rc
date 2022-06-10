@@ -1,4 +1,4 @@
-#!/usr/bin/screen -c 
+#!/usr/bin/screen -c
 
 # vim: ts=8 noexpandtab sts=8
 
@@ -21,12 +21,13 @@ by ${HOME}/bin/hercules.sh and to set the LPAR name.
 # setenv  HERCULES_IPL		# DASD address of IPL volume
 # setenv  HERCULES_SERIAL	# default is 012449 (IBM Kingston zip code)
 # setenv  HERCULES_CORE		# memory -- default is 16M
+# setenv  HERCULES_MASTCAT	# master catalog password on MVS 3.8
 # setenv  HERCULES_PASSWORD	# for the web interface
 
 # setenv  HERCULES_RSCS		# Local RSCS name
 
 # setenv  HERCULES_EPOCH	# Use 1960 with systems not patched for Y2K
-# setenv  HERCULES_YROFFSET	# Use -28 with systems not patched for Y2K 
+# setenv  HERCULES_YROFFSET	# Use -28 with systems not patched for Y2K
 
 # Our common configuration expects the following ports defined; they MUST
 # be unique for each Hercules instance run simultaneously on same host. We
@@ -35,8 +36,10 @@ by ${HOME}/bin/hercules.sh and to set the LPAR name.
 
 # setenv	HERCULES_CONSOLE	# 3270 port for console and TSO
 # setenv	HERCULES_ASCII_READER	# Port for data sent in ASCII
-# setenv	HERCULES_EBCDIC_READER	# Port for data sent in EBCDIC 
+# setenv	HERCULES_EBCDIC_READER	# Port for data sent in EBCDIC
 # setenv	HERCULES_WEB		# Hercules web console/documentation
+
+setenv	HERCULES_MASTCAT	secret	# DEFAULT for master catalog on MVS 3.8
 
 source hercules.environment
 
@@ -46,7 +49,7 @@ defscrollback	1000
 hardstatus	alwayslastline "%{Rk} %S %{kW} %h %n%f %t %= %H%? %l %{Rk} %S "
 nethack		on
 sessionname	${HERCULES_NAME}
-setenv		HERCULES_RC      ../common/hercules-under-screen.rc 
+setenv		HERCULES_RC		../common/hercules-under-screen.rc
 startup_message off
 
 # Run the primary hercules task. The wrapper script will setup
@@ -57,4 +60,4 @@ startup_message off
 # fire off the associated 3270 console, log viewers, and printer tasks
 # (if any)
 
-screen -t hercules 0 ${HOME}/bin/hercules.sh 
+screen -t hercules 0 ${HOME}/bin/hercules.sh
