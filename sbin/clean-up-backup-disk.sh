@@ -154,8 +154,8 @@ fi
 
 if "${CLEANED}" ; then
 	fstrim -v ${BACKUP_DIRECTORY}
+	echo ' '
+	df -h ${BACKUP_DIRECTORY}
 fi
 
-echo ' '
-df -h ${BACKUP_DIRECTORY}
 echo ' '
