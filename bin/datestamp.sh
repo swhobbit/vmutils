@@ -5,6 +5,6 @@ fi
 
 read message
 while [ $? -eq 0 ] ; do
-	echo "$(date +%F) ${message}"
+	echo "$(date +"${DATE_FORMAT:-%F}") ${message}"
 	read message
 done
