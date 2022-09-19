@@ -147,7 +147,7 @@ log_notice "Executing ${BACKUP_TYPE} backup for ${DIRECTORIES}"
 tar	\
       --create	\
       --use-compress-program=pigz	\
-      --file ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz	\
+      --file ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-temp-${BACKUP_TYPE}.tgz	\
       ${INCREMENTAL_OPTION}	\
       --exclude=.cache	\
       --exclude=backup	\
@@ -162,13 +162,19 @@ TAR_RETURN_CODE=$?
 # the real one.
 
 if [ ${TAR_RETURN_CODE} -ne 0 ] ; then 
+  # failed back up of any type
+
   echo ''
   log_error --stderr	\
   	"${BACKUP_TYPE} backup failed, return code ${TAR_RETURN_CODE}."
   rm -f "${DIFFERENTIAL_TOUCH_FILE}.new"
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
-  mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
+  # clean full back up
+
   echo ''
+  mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
+  mv ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-temp-${BACKUP_TYPE}.tgz \
+  	${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
   ls -l -h ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
   log_notice --stderr	\
   	"${BACKUP_TYPE} backup complete,"	\
@@ -176,6 +182,10 @@ elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   echo ''
   df -H ${BACKUP_DIRECTORY}
 else 
+  # clean differential back up
+
+  mv ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-temp-${BACKUP_TYPE}.tgz \
+  	${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
   log_notice "${BACKUP_TYPE} backup complete."
 fi
 
