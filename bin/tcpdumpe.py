@@ -14,7 +14,7 @@ __version__ = '1.0.2'
 
 def _Dump(table):
   """Execute tcpdump and process the output."""
-  argv = list(sys.argv)
+  argv = list((sys.argv[0], '-l', '-X', '-s' , '1500')) + list(sys.argv[1:] )
   argv[0] = 'tcpdump'
   print(' '.join(argv))
   # <tab>       0x0000:  3333 0000 0001 dca6 3202 5864 86dd 600a
