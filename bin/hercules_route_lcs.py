@@ -157,7 +157,7 @@ def _ReadInterfaces(mac, gateway_ip, device):
   regex_entry = re.compile(r'^\d+:', flags=(re.DOTALL|re.MULTILINE))
   regex_device = re.compile(r'\s*([a-zA-Z]{2,4}\d*): <.+>.+')
 
-  args = ('ip addr list ' + (device or '')).split()
+  args = ('ip -4 addr list ' + (device or '')).split()
   proc = subprocess.run(args,
                         capture_output=True,
                         check=True,
