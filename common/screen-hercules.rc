@@ -21,6 +21,7 @@ by ${HOME}/bin/hercules.sh and to set the LPAR name.
 # setenv  HERCULES_IPL		# DASD address of IPL volume
 # setenv  HERCULES_SERIAL	# default is 012449 (IBM Kingston zip code)
 # setenv  HERCULES_CORE		# memory -- default is 16M
+# setenv  HERCULES_MASTCAT      # master catalog password on MVS 3.8
 # setenv  HERCULES_PASSWORD	# for the web interface
 
 # setenv  HERCULES_RSCS		# Local RSCS name
@@ -37,6 +38,8 @@ by ${HOME}/bin/hercules.sh and to set the LPAR name.
 # setenv	HERCULES_ASCII_READER	# Port for data sent in ASCII
 # setenv	HERCULES_EBCDIC_READER	# Port for data sent in EBCDIC 
 # setenv	HERCULES_WEB		# Hercules web console/documentation
+
+setenv	HERCULES_MASTCAT	secret	# DEFAULT for master catalog on MVS 3.8 
 
 source hercules.environment
 
