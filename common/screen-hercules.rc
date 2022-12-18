@@ -39,11 +39,7 @@ by ${HOME}/bin/hercules.sh and to set the LPAR name.
 # setenv	HERCULES_EBCDIC_READER	# Port for data sent in EBCDIC
 # setenv	HERCULES_WEB		# Hercules web console/documentation
 
-<<<<<<< HEAD
-setenv	HERCULES_MASTCAT	secret	# DEFAULT for master catalog on MVS 3.8 
-=======
 setenv	HERCULES_MASTCAT	secret	# DEFAULT for master catalog on MVS 3.8
->>>>>>> a1647781d18e9c944bdffca83d658edeb8be3bfd
 
 source hercules.environment
 
