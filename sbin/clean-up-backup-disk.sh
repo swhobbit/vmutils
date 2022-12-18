@@ -87,7 +87,7 @@ fi
 if [ "$(date +%d)" -le 7 ] ; then
 
 	# Clean up moderately old weekly backups of all types (leaving monthly)
-	log_notice "NOT Deleting weekly backups older than ${FULL_WEEKLY_DAYS_TO_DELETE_AFTER} days"
+	log_notice "Deleting weekly backups older than ${FULL_WEEKLY_DAYS_TO_DELETE_AFTER} days"
 	find	\
 		${BACKUP_DIRECTORY}	\
 		-type f 	\
@@ -95,6 +95,7 @@ if [ "$(date +%d)" -le 7 ] ; then
 		! -name 'dump-*-????-??-0[1-7]_*.tgz'	\
 		-mtime +${FULL_WEEKLY_DAYS_TO_DELETE_AFTER}	\
 		-ls	\
+		-delete	\
 		| sort -k 11
 	echo ''
 
