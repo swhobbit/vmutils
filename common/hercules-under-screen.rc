@@ -2,11 +2,11 @@ sh screen -t console	1	c3270	-model 2 console@127.0.0.1 ${HERCULES_CONSOLE}
 
 # This assumes logging is started from the command line that Hercules is invoked
 # via
-sh screen -t log	2	less	+F -S -I log/hercules-${HERCULES_NAME}.log
+sh screen -t log	2	less	+F -S -I log/hercules-$(HERCULES_NAME).log
 
 # Must be after IPL and printer is opened.
 hao tgt HHCPR007I.+030E
-hao cmd sh sleep 5 && screen -t syslog        3       less +F -S -I log/syslog-${HERCULES_NAME}.log
+hao cmd sh sleep 5 && screen -t syslog        3       less +F -S -I log/syslog-$(HERCULES_NAME).log
 
 # If ESA or Z arch and running OS, when SYSCONs goes active make it an
 # active console
@@ -22,7 +22,7 @@ hao cmd /r 00,auto=n
 hao tgt IEE141A MASTER AND ALL ALTERNATES UNAVAILABLE
 hao cmd /V 010,CONSOLE
 
-# If we lose the syslog, route the log to the printer log. 
+# If we lose the syslog, route the log to the printer log.
 # (Doesn't work because of non-master console authority issues.)
 hao tgt IEE143I  01F NOW RECEIVING HARDCOPY, REASON=HCSW
 hao cmd /V 30E,HARDCPY
@@ -30,6 +30,10 @@ hao cmd /V 30E,HARDCPY
 # Automatically route any TAP network device to the local live subnet
 hao tgt HHCLC055I (tap[0-9]+)
 hao cmd sh hercules_route_lcs.py -d $1 $(HERCULES_NAME).oat
+
+# Respond to our not very secret master password prompt
+hao tgt ([0-9]{2}) IEC301A S JOB .+ DSNAME SYS1.VMASTCAT
+hao cmd /$1 $(HERCULES_MASTCAT)
 
 # We run most base disk R/O so the shadow file merge below never wipes the
 # first generation; live updates go into the second generation.
@@ -51,4 +55,4 @@ sh [ -x hercules.coda.sh ] && ./hercules.coda.sh
 # machine is reachable via the host.
 #
 # Assumes Linux simple interface name!
-sh [ -f ${HERCULES_NAME}.oat ] && host ${HERCULES_NAME} | grep -q address && sudo arp -i eth0 -Ds ${HERCULES_NAME} eth0 pub
+sh [ -f $(HERCULES_NAME).oat ] && host $(HERCULES_NAME) | grep -q address && sudo arp -i eth0 -Ds $(HERCULES_NAME) eth0 pub
