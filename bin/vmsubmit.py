@@ -355,11 +355,9 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     raise RuntimeError(error)
 
   if is_ebcdic:
-    print('File', fname, ftype, 'is EBCDIC')
     port = keywords['port_ebcdic']
     file_handle = open(full_name, 'rb')
   else:
-    print('File', fname, ftype, 'is ASCII')
     port = keywords['port_ascii']
     file_handle = open(full_name, 'rt', encoding='utf-8')
 
@@ -391,14 +389,22 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
                    is_ebcdic,
                    network_socket)
     else:
-      print('Opening reader on host {:s} port {:d} for user '
-            '{:s} file {:s} {:s} {:s}'.format(
+      def charset():
+         """Report Character set in use."""
+         if is_ebcdic:
+           return "EBCDIC"
+         else:
+           return "ASCII"
+
+      print('Opening reader on host {:s} port {:d} for '
+            '{:s} file {:s} {:s} {:s} for user {:s}'.format(
                 keywords['host'],
                 port,
-                keywords['login'],
+                charset(),
                 fname,
                 ftype,
-                fmode))
+                fmode,
+                keywords['login']))
       network_socket = socket.create_connection(
           (keywords['host'], port))
       _ReaderPrologue(keywords,
