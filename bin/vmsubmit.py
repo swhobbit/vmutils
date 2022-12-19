@@ -231,90 +231,21 @@ def _Send(network_socket, buffer, translate=False):
 def _Expect(network_socket, prompt, expected):
     """Write single line to the UFT server and look for the expected response"""
     if prompt:
-        _Send(network_socket, prompt)
-        _Send(network_socket, b'\r\n')
-        print(f'Sent:\t{prompt}')
+        _Send(network_socket, f'{prompt}\r\n')
+        print(f'Sent:\t{prompt},\twant:\t{expected}')
 
     if expected:
+        try:
+            # Get integer from HTTPStatus object
+            expected = expected.value
+        except (NameError, AttributeError):
+            pass
+
         expected = str(expected)  # Might be an integer
         actual = network_socket.recv(512).decode(encoding='utf-8')
         if not actual.startswith(expected):
             raise client.BadStatusLine(
                f'\nSent: {prompt},\nExpected: {expected},\nReceived: {actual}')
-
-def _UftPrologue(login,              # pylint: disable=R0913
-                 hostname,
-                 fname,
-                 ftype,
-                 length,
-                 date,
-                 is_ebcdic,
-                 network_socket):
-    """Generate header records for a UFT submission"""
-    _Expect(network_socket, None, '2')
-    _Expect(network_socket,
-                    f'FILE {length} {getpass.getuser().upper()}',
-                    http.HTTPStatus.CREATED)
-    _Expect(network_socket,
-                    f'USER {login}@{hostname}',
-                    http.HTTPStatus.CREATED)
-
-    if is_ebcdic:
-        _Expect(network_socket, 'TYPE F 80', http.HTTPStatus.CREATED)
-    else:
-        _Expect(network_socket, 'TYPE A', http.HTTPStatus.CREATED)
-
-    _Expect(network_socket,
-                    f'NAME {fname}.{ftype}',
-                    http.HTTPStatus.CREATED)
-    _Expect(network_socket, f'DATE {date}', http.HTTPStatus.CREATED)
-    _Expect(network_socket, f'DATA {length}', http.HTTPStatus.CREATED)
-
-
-def _ReaderPrologue(keywords,
-                    filename,
-                    date,
-                    is_ebcdic,
-                    network_socket):
-    """Generate Header records for a submission to the VM reader"""
-    fname, ftype, fmode = filename
-
-    is_os = keywords['is_os']
-    if keywords['remote_node'] and 'MVS' in keywords['remote_node']:
-        is_os = True
-    elif ftype in ('JCL', 'JOB', 'XMI'):
-        is_os = True
-
-    if is_os:
-        print(f'Processsing {fname} {ftype} {fmode} in MVS mode.')
-
-    if keywords['remote_node']:
-        # Remote user via RSCS
-        id_card = (f'USERID {keywords["rscs_vm"]:8s} '
-                   f'CLASS {fmode:1s} NAME {fname:8s} {ftype:8s}')
-        tag_card = f'{keywords["remote_node"]:8s} {keywords["login"]:8s}'
-    else:
-        # Local user
-        id_card = (f'USERID {keywords["login"]:8s} CLASS {fmode:1s} '
-                   f'NAME {fname:8s} {ftype:8s}')
-        tag_card = None
-
-    if is_os:
-        read_card = None
-    else:
-        # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
-        read_card = (f':READ {fname:8s} {ftype:8s} {fmode:2s} '
-                     f'{socket.gethostname().upper().split(".")[0]:6s}'
-                     f'{date:17s}'
-                    )
-
-    for card in (id_card, tag_card, read_card):
-        if card:
-            if is_ebcdic:
-                card = f'{card:80}'.translate(TRANSLATE_TABLE)
-            else:
-                card = card + '\n'
-            _Send(network_socket, card)
 
 
 def _CharacterSet(is_ebcdic):
@@ -326,19 +257,169 @@ def _CharacterSet(is_ebcdic):
     return "ASCII"
 
 
+def _UftPrologue(keywords,
+                 file_info,
+                 network_socket):
+    """Generate header records for a UFT submission"""
+    _Expect(network_socket, None, '2')
+    _Expect(network_socket,
+            f'FILE {file_info["length"]} {getpass.getuser().upper()}',
+            http.HTTPStatus.CREATED)
+    _Expect(network_socket,
+            f'USER {keywords["login"]}',
+            http.HTTPStatus.CREATED)
+
+    if file_info['is_ebcdic']:
+        _Expect(network_socket, 'TYPE F 80', http.HTTPStatus.CREATED)
+    else:
+        _Expect(network_socket, 'TYPE A', http.HTTPStatus.CREATED)
+
+    _Expect(network_socket,
+            f'NAME {file_info["fname"]}.{file_info["ftype"]}',
+            http.HTTPStatus.CREATED)
+    if keywords["remote_node"]:
+        _Expect(network_socket,
+                f'DEST {keywords["remote_node"]}',
+                http.HTTPStatus.CREATED)
+
+    _Expect(network_socket,
+            f'DATE {file_info["date"]}',
+            http.HTTPStatus.CREATED)
+    _Expect(network_socket,
+            f'DATA {file_info["length"]}',
+             http.HTTPStatus.CREATED)
+
+
+def _UftSend(keywords,
+             file_info,
+             data_buffer):
+    """Send a file via a remote UFT server"""
+
+    if not file_info['is_ebcdic']:
+        # Internet protocol is \r\n for new lines.
+        data_buffer = data_buffer.replace('\n', '\r\n')
+        file_info['length'] = len(data_buffer)
+
+    print(f'Opening UFT host {keywords["host"]} '
+          f'port {keywords["port_uft"]} '
+          f'for user {keywords["login"]} '
+          f'{_CharacterSet(file_info["is_ebcdic"])} '
+          f'file {file_info["fname"]}.{file_info["ftype"]} '
+          f'with {file_info["length"]} bytes')
+
+    network_socket = socket.create_connection((keywords['host'],
+                                               keywords['port_uft']))
+
+    try:
+        _UftPrologue(keywords,
+                     file_info,
+                     network_socket)
+        _Send(network_socket, data_buffer)
+        _Expect(network_socket, 'EOF', '213')
+        _Expect(network_socket, 'QUIT', '250')
+    finally:
+        try:
+            network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
+        except (OSError, ConnectionResetError) as ex:
+            print('Error during shutdown of socket:', ex)
+        network_socket.close()
+
+
+def _ReaderPrologue(keywords,
+                    file_info,
+                    network_socket):
+    """Generate Header records for a submission to the VM reader"""
+
+    is_os = keywords['is_os']
+    if keywords['remote_node'] and 'MVS' in keywords['remote_node']:
+        is_os = True
+    elif file_info["ftype"] in ('JCL', 'JOB', 'XMI'):
+        is_os = True
+
+    if is_os:
+        print(f'Processsing '
+              f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
+              'in MVS mode.')
+
+    if keywords['remote_node']:
+        # Remote user via RSCS
+        id_card = (f'USERID {keywords["rscs_vm"]:8s} '
+                   f'CLASS {file_info["fmode"]:1s} '
+                   f'NAME {file_info["fname"]:8s} {file_info["ftype"]:8s}')
+        tag_card = f'{keywords["remote_node"]:8s} {keywords["login"]:8s}'
+    else:
+        # Local user
+        id_card = (f'USERID {keywords["login"]:8s} '
+                   f'CLASS {file_info["fmode"]:1s} '
+                   f'NAME {file_info["fname"]:8s} {file_info["ftype"]:8s}')
+        tag_card = None
+
+    if is_os:
+        read_card = None
+    else:
+        # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
+        read_card = (f'{file_info["fname"]:8s} '
+                     f'{file_info["ftype"]:8s} '
+                     f'{file_info["fmode"]:2s} '
+                     f'{socket.gethostname().upper().split(".")[0]:6s}'
+                     f'{file_info["date"]:17s}'
+                    )
+
+    for card in (id_card, tag_card, read_card):
+        if card:
+            if file_info['is_ebcdic']:
+                card = f'{card:80}'.translate(TRANSLATE_TABLE)
+            else:
+                card = card + '\n'
+            _Send(network_socket, card)
+
+
+def _ReaderSend(keywords,
+                file_info,
+                data_buffer):
+    """Send a file to a remote VM virtual (network) reader"""
+
+    if file_info['is_ebcdic']:
+        port = keywords['port_ebcdic']
+    else:
+        port = keywords['port_ascii']
+
+    print(f'Opening VM reader on host {keywords["host"]} '
+            f'port {port} '
+            f'for {_CharacterSet(file_info["is_ebcdic"])} file '
+            f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
+            f'for user {keywords["login"]}')
+
+    network_socket = socket.create_connection((keywords['host'],
+                                               port))
+    try:
+        _ReaderPrologue(keywords,
+                        file_info,
+                        network_socket)
+
+        _Send(network_socket, data_buffer)
+    finally:
+        try:
+            network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
+        except (OSError, ConnectionResetError) as ex:
+            print('Error during shutdown of socket:', ex)
+        network_socket.close()
+
+
 def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     """Send a single file to VM, prefixed by USERID and READ cards."""
     file_path = path.abspath(path.expanduser(file_path))
     length = path.getsize(file_path)
     date = time.strftime('%D %T', time.localtime(path.getmtime(file_path)))
 
-    file_name = path.basename(file_path).replace('_', '$').upper()
-    file_name = file_name.strip().strip('.').split('.')
-    fname = file_name[0]
-    if len(file_name) == 1:
+    base_name = path.basename(file_path).replace('_', '$').upper()
+    base_name = base_name.strip().strip('.').split('.')
+    fname = base_name[0]
+
+    if len(base_name) == 1:
         ftype = keywords['filetype_default']
     else:
-        ftype = file_name[1][:8]
+        ftype = base_name[1][:8]
     fmode = keywords['filemode'][:2]
 
     is_ebcdic = keywords['ebcdic'] or ftype in ('VMARC', 'XMI')
@@ -353,65 +434,35 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     # Ignore possible use of "with", we have two opens for the same handle
     # pylint: disable=R1732
     if is_ebcdic:
-        port = keywords['port_ebcdic']
-        file_handle = open(file_path, 'rb')
+        with open(file_path, 'rb') as file_handle:
+            data_buffer = file_handle.read()
     else:
-        port = keywords['port_ascii']
-        file_handle = open(file_path, 'rt', encoding='utf-8')
-
-    data_buffer = file_handle.read()
-    file_handle.close()
+        with open(file_path, 'rt', encoding='utf-8') as file_handle:
+            data_buffer = file_handle.read()
 
     # Insure any ASCII file ends with a new line, unless it was completely
     # empty
     if (not is_ebcdic and data_buffer and data_buffer[-1] != '\n'):
+
         data_buffer += '\n'
 
-    try:
-        if is_uft:
-            if not is_ebcdic:
-                # Internet protocol is \r\n for new lines.
-                data_buffer = data_buffer.replace('\n', '\r\n')
-            print(f'Opening UFT host {keywords["host"]} '
-                  f'port {keywords["port_uft"]} '
-                  f'for user {keywords["login"]} '
-                  f'{_CharacterSet(is_ebcdic)} '
-                  f'file {fname} {ftype}')
-            network_socket = socket.create_connection((keywords['host'],
-                                                      keywords['port_uft']))
-            _UftPrologue(keywords['login'],
-                         keywords['remote_node'],
-                         fname,
-                         ftype,
-                         len(data_buffer),
-                         date,
-                         is_ebcdic,
-                         network_socket)
-        else:
-            print(f'Opening reader on host {keywords["host"]} '
-                  f'port {port} '
-                  f'for {_CharacterSet(is_ebcdic)} '
-                  f'file {fname} {ftype} {fmode} '
-                  f'for user {keywords["login"]}')
-            network_socket = socket.create_connection(
-                    (keywords['host'], port))
-            _ReaderPrologue(keywords,
-                            (fname, ftype, fmode),
-                            date,
-                            is_ebcdic,
-                            network_socket)
+    file_info = {
+        'fname':fname,
+        'ftype':ftype,
+        'fmode':fmode,
+        'date':date,
+        'length':length,
+        'is_ebcdic':is_ebcdic,
+    }
 
-        _Send(network_socket, data_buffer)
-
-        if is_uft:
-            _Expect(network_socket, 'EOF', '213')
-            _Expect(network_socket, 'QUIT', '250')
-    finally:
-        try:
-            network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
-        except (OSError, ConnectionResetError) as ex:
-            print('Error during shutdown of socket:', ex)
-        network_socket.close()
+    if is_uft:
+        _UftSend(keywords,
+                 file_info,
+                 data_buffer)
+    else:
+        _ReaderSend(keywords,
+                    file_info,
+                    data_buffer)
 
 
 def _MakeTranslateTable():
