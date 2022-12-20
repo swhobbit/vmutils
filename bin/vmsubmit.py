@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
-
+# vim: ts=4 sw=4 expandtab
+        
 """Send a text file to a user via the VM reader or UTF protocol"""
 
 import argparse
 import getpass
 from http import client
-import http
+from http import HTTPStatus
 from os import path
 import os
 import socket
@@ -229,23 +230,31 @@ def _Send(network_socket, buffer, translate=False):
 
 
 def _Expect(network_socket, prompt, expected):
-    """Write single line to the UFT server and look for the expected response"""
+    """Write one line to the UFT server and look for one of the possible expected response(s)"""
     if prompt:
+        print(f'Sending:\t{prompt},\twant:\t{expected}')
         _Send(network_socket, f'{prompt}\r\n')
-        print(f'Sent:\t{prompt},\twant:\t{expected}')
 
-    if expected:
-        try:
-            # Get integer from HTTPStatus object
-            expected = expected.value
-        except (NameError, AttributeError):
-            pass
+    if not expected:
+        return 
 
-        expected = str(expected)  # Might be an integer
-        actual = network_socket.recv(512).decode(encoding='utf-8')
-        if not actual.startswith(expected):
-            raise client.BadStatusLine(
-               f'\nSent: {prompt},\nExpected: {expected},\nReceived: {actual}')
+    if not (isinstance(expected, tuple) or isinstance(expected, list)):
+        expected = (expected,)
+
+    actual = network_socket.recv(512).decode(encoding='utf-8')
+
+    for entry in expected:
+        if isinstance(entry, HTTPStatus):
+            entry = str(entry.value)
+        elif isinstance(entry, int):
+            entry = str(entry)
+
+        if actual.startswith(entry):
+            return
+
+    # Bad response from server, report it and die.
+    raise client.BadStatusLine(
+       f'\nSent: {prompt},\nExpected: {expected},\nReceived: {actual}')
 
 
 def _CharacterSet(is_ebcdic):
@@ -261,33 +270,35 @@ def _UftPrologue(keywords,
                  file_info,
                  network_socket):
     """Generate header records for a UFT submission"""
-    _Expect(network_socket, None, '2')
+    _Expect(network_socket, None, ('2', HTTPStatus.CONTINUE))
     _Expect(network_socket,
             f'FILE {file_info["length"]} {getpass.getuser().upper()}',
-            http.HTTPStatus.CREATED)
+            (HTTPStatus.CREATED, HTTPStatus.OK))
     _Expect(network_socket,
             f'USER {keywords["login"]}',
-            http.HTTPStatus.CREATED)
+            HTTPStatus.OK)
 
     if file_info['is_ebcdic']:
-        _Expect(network_socket, 'TYPE F 80', http.HTTPStatus.CREATED)
+        _Expect(network_socket, 'TYPE I', (HTTPStatus.CREATED, HTTPStatus.OK))
+        _Expect(network_socket, 'LRECL 80', (HTTPStatus.CREATED, HTTPStatus.OK))
     else:
-        _Expect(network_socket, 'TYPE A', http.HTTPStatus.CREATED)
+        _Expect(network_socket, 'TYPE A', (HTTPStatus.CREATED, HTTPStatus.OK))
 
     _Expect(network_socket,
             f'NAME {file_info["fname"]}.{file_info["ftype"]}',
-            http.HTTPStatus.CREATED)
+            (HTTPStatus.CREATED, HTTPStatus.OK))
+
     if keywords["remote_node"]:
         _Expect(network_socket,
                 f'DEST {keywords["remote_node"]}',
-                http.HTTPStatus.CREATED)
+                (HTTPStatus.CREATED, HTTPStatus.OK))
 
     _Expect(network_socket,
             f'DATE {file_info["date"]}',
-            http.HTTPStatus.CREATED)
+            (HTTPStatus.CREATED, HTTPStatus.OK))
     _Expect(network_socket,
             f'DATA {file_info["length"]}',
-             http.HTTPStatus.CREATED)
+             (123, HTTPStatus.CREATED))
 
 
 def _UftSend(keywords,
@@ -302,10 +313,10 @@ def _UftSend(keywords,
 
     print(f'Opening UFT host {keywords["host"]} '
           f'port {keywords["port_uft"]} '
-          f'for user {keywords["login"]} '
-          f'{_CharacterSet(file_info["is_ebcdic"])} '
+          f'for {_CharacterSet(file_info["is_ebcdic"])} '
           f'file {file_info["fname"]}.{file_info["ftype"]} '
-          f'with {file_info["length"]} bytes')
+          f'with {file_info["length"]} bytes '
+          f'for user {keywords["login"]})')
 
     network_socket = socket.create_connection((keywords['host'],
                                                keywords['port_uft']))
@@ -315,8 +326,8 @@ def _UftSend(keywords,
                      file_info,
                      network_socket)
         _Send(network_socket, data_buffer)
-        _Expect(network_socket, 'EOF', '213')
-        _Expect(network_socket, 'QUIT', '250')
+        _Expect(network_socket, 'EOF', ('213', HTTPStatus.OK))
+        _Expect(network_socket, 'QUIT', ('250', HTTPStatus.OK))
     finally:
         try:
             network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
