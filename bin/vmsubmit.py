@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 # vim: ts=4 sw=4 expandtab
-        
+
 """Send a text file to a user via the VM reader or UTF protocol"""
 
 import argparse
@@ -66,11 +66,19 @@ def _ParseCommandLine(command_line):
             epilog=__copyright__
     )
     exclusive_port_flags = parser.add_mutually_exclusive_group()
+
     parser.add_argument(
             '-v',
             '--version',
             action='version',
             version='%(prog)s ' + __version__)
+    parser.add_argument(
+            '-d',
+            '--debug',
+            default=False,
+            action='store_true',
+            help='Report addtional debugging information about the transfer '
+            '(Default: %(default)s)')
     parser.add_argument(
             '-l',
             '--login',
@@ -117,8 +125,8 @@ def _ParseCommandLine(command_line):
             action='store_true',
             help='Transmit the file (which must already be in EBCDIC), '
             'via the EBCDIC reader port or UTF mode E '
-            '(Default: %(default)s, except this option is automatically enabled '
-            'for files of type VMARC and XMI, '
+            '(Default: %(default)s, except this option is automatically '
+            'enabled for files of type VMARC and XMI, '
             'which are always in EBCDIC.)'
     )
     parser.add_argument(
@@ -139,7 +147,8 @@ def _ParseCommandLine(command_line):
             dest='is_os',
             default=False,
             action='store_true',
-            help='The target system is running OS/360 (or a successor), not VM.  '
+            help='The target system is running OS/360 (or a successor), '
+            'not VM. '
             'To avoid mucking things up on such a system, '
             'no VM READ header card will preface the file. '
             '(Default: %(default)s, '
@@ -213,7 +222,7 @@ def _ParseCommandLine(command_line):
     )
     return parser.parse_args(command_line)
 
-def _Send(network_socket, buffer, translate=False):
+def _Send(network_socket, buffer, debug, translate=False):
     """Write buffer, translating if needed and making strings bytes."""
     if translate:
         buffer = buffer.translate(TRANSLATE_TABLE)
@@ -221,24 +230,32 @@ def _Send(network_socket, buffer, translate=False):
     if isinstance(buffer, str):
         # We don't trust Python locale to do the right thing; this brute force
         # handles conversion in ASCII -or- if we translated to EBCDIC above.
+        if debug:
+            if len(buffer) < 82 and not translate:
+                print(f'Sending {len(buffer)} characters:', buffer.rstrip())
+            else:
+                print(f'Sending {len(buffer)} characters')
         buffer = bytes.fromhex(''.join([f'{ord(x):02x}' for x in buffer]))
-        print(f'Sending {len(buffer)} string bytes')
+
     else:
-        print(f'Sending {len(buffer)} data bytes')
+        if debug:
+            print(f'Sending {len(buffer)} data bytes')
 
     network_socket.sendall(buffer)
 
 
-def _Expect(network_socket, prompt, expected):
-    """Write one line to the UFT server and look for one of the possible expected response(s)"""
+def _Expect(network_socket, prompt, expected, debug):
+    """Write a line to the server & look for any of the expected response(s)"""
     if prompt:
-        print(f'Sending:\t{prompt},\twant:\t{expected}')
-        _Send(network_socket, f'{prompt}\r\n')
+        if debug:
+            print(f'Sending:  {prompt},\twant: {expected}')
+        _Send(network_socket, f'{prompt}\r\n', False)
 
     if not expected:
-        return 
+        return
 
-    if not (isinstance(expected, tuple) or isinstance(expected, list)):
+    # Convert any atomic object to a tuple we can iterate over below
+    if not isinstance(expected, (tuple, list)):
         expected = (expected,)
 
     actual = network_socket.recv(512).decode(encoding='utf-8')
@@ -252,7 +269,8 @@ def _Expect(network_socket, prompt, expected):
         if actual.startswith(entry):
             return
 
-    # Bad response from server, report it and die.
+    # Bad response from server, quit conversation, report it and die.
+    _Send(network_socket, 'QUIT\r\n', debug)
     raise client.BadStatusLine(
        f'\nSent: {prompt},\nExpected: {expected},\nReceived: {actual}')
 
@@ -270,35 +288,50 @@ def _UftPrologue(keywords,
                  file_info,
                  network_socket):
     """Generate header records for a UFT submission"""
-    _Expect(network_socket, None, ('2', HTTPStatus.CONTINUE))
+    _Expect(network_socket,
+            None,
+            ('2', HTTPStatus.CONTINUE),
+            keywords['debug'])
     _Expect(network_socket,
             f'FILE {file_info["length"]} {getpass.getuser().upper()}',
-            (HTTPStatus.CREATED, HTTPStatus.OK))
+            (HTTPStatus.CREATED, HTTPStatus.OK),
+            keywords['debug'])
     _Expect(network_socket,
             f'USER {keywords["login"]}',
-            HTTPStatus.OK)
+            HTTPStatus.OK,
+            keywords['debug'])
 
     if file_info['is_ebcdic']:
-        _Expect(network_socket, 'TYPE I', (HTTPStatus.CREATED, HTTPStatus.OK))
-        _Expect(network_socket, 'LRECL 80', (HTTPStatus.CREATED, HTTPStatus.OK))
+        _Expect(network_socket,
+                'TYPE I', (HTTPStatus.CREATED, HTTPStatus.OK),
+                keywords['debug'])
+        _Expect(network_socket,
+                'LRECL 80', (HTTPStatus.CREATED, HTTPStatus.OK),
+                keywords['debug'])
     else:
-        _Expect(network_socket, 'TYPE A', (HTTPStatus.CREATED, HTTPStatus.OK))
+        _Expect(network_socket,
+                'TYPE A', (HTTPStatus.CREATED, HTTPStatus.OK),
+                keywords['debug'])
 
     _Expect(network_socket,
             f'NAME {file_info["fname"]}.{file_info["ftype"]}',
-            (HTTPStatus.CREATED, HTTPStatus.OK))
+            (HTTPStatus.CREATED, HTTPStatus.OK),
+            keywords['debug'])
 
     if keywords["remote_node"]:
         _Expect(network_socket,
                 f'DEST {keywords["remote_node"]}',
-                (HTTPStatus.CREATED, HTTPStatus.OK))
+                (HTTPStatus.CREATED, HTTPStatus.OK),
+                keywords['debug'])
 
     _Expect(network_socket,
             f'DATE {file_info["date"]}',
-            (HTTPStatus.CREATED, HTTPStatus.OK))
+            (HTTPStatus.CREATED, HTTPStatus.OK),
+            keywords['debug'])
     _Expect(network_socket,
             f'DATA {file_info["length"]}',
-             (123, HTTPStatus.CREATED))
+             (123, HTTPStatus.CREATED),
+             keywords['debug'])
 
 
 def _UftSend(keywords,
@@ -311,12 +344,13 @@ def _UftSend(keywords,
         data_buffer = data_buffer.replace('\n', '\r\n')
         file_info['length'] = len(data_buffer)
 
-    print(f'Opening UFT host {keywords["host"]} '
-          f'port {keywords["port_uft"]} '
-          f'for {_CharacterSet(file_info["is_ebcdic"])} '
-          f'file {file_info["fname"]}.{file_info["ftype"]} '
-          f'with {file_info["length"]} bytes '
-          f'for user {keywords["login"]})')
+    if keywords['debug']:
+        print(f'Opening UFT host {keywords["host"]} '
+              f'port {keywords["port_uft"]} '
+              f'for {_CharacterSet(file_info["is_ebcdic"])} '
+              f'file {file_info["fname"]}.{file_info["ftype"]} '
+              f'with {file_info["length"]} bytes '
+              f'for user {keywords["login"]})')
 
     network_socket = socket.create_connection((keywords['host'],
                                                keywords['port_uft']))
@@ -325,15 +359,22 @@ def _UftSend(keywords,
         _UftPrologue(keywords,
                      file_info,
                      network_socket)
-        _Send(network_socket, data_buffer)
-        _Expect(network_socket, 'EOF', ('213', HTTPStatus.OK))
-        _Expect(network_socket, 'QUIT', ('250', HTTPStatus.OK))
+        _Send(network_socket,
+              data_buffer,
+              keywords['debug'])
+        _Expect(network_socket,
+                'EOF', ('213', HTTPStatus.OK),
+                keywords['debug'])
+        _Expect(network_socket,
+                'QUIT', ('250', HTTPStatus.OK),
+                keywords['debug'])
     finally:
         try:
             network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
         except (OSError, ConnectionResetError) as ex:
             print('Error during shutdown of socket:', ex)
         network_socket.close()
+    print(f'File {file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} sent')
 
 
 def _ReaderPrologue(keywords,
@@ -382,7 +423,7 @@ def _ReaderPrologue(keywords,
                 card = f'{card:80}'.translate(TRANSLATE_TABLE)
             else:
                 card = card + '\n'
-            _Send(network_socket, card)
+            _Send(network_socket, card, keywords['debug'])
 
 
 def _ReaderSend(keywords,
@@ -395,11 +436,12 @@ def _ReaderSend(keywords,
     else:
         port = keywords['port_ascii']
 
-    print(f'Opening VM reader on host {keywords["host"]} '
-            f'port {port} '
-            f'for {_CharacterSet(file_info["is_ebcdic"])} file '
-            f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
-            f'for user {keywords["login"]}')
+    if keywords['debug']:
+        print(f'Opening VM reader on host {keywords["host"]} '
+                f'port {port} '
+                f'for {_CharacterSet(file_info["is_ebcdic"])} file '
+                f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
+                f'for user {keywords["login"]}')
 
     network_socket = socket.create_connection((keywords['host'],
                                                port))
@@ -408,13 +450,14 @@ def _ReaderSend(keywords,
                         file_info,
                         network_socket)
 
-        _Send(network_socket, data_buffer)
+        _Send(network_socket, data_buffer, keywords['debug'])
     finally:
         try:
             network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
         except (OSError, ConnectionResetError) as ex:
             print('Error during shutdown of socket:', ex)
         network_socket.close()
+    print(f'File {file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} sent')
 
 
 def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
