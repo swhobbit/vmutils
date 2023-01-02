@@ -111,6 +111,18 @@ if [ "$(date +%d)" -le 7 ] ; then
 		| sort -k 11
 	echo ''
 
+	# Clean up moderately old incomplete backups (leaving completed)
+	log_notice "Deleting incomplete backups older than ${DAYS_OF_DIFFERENTIAL_BACKUP} days"
+	find	\
+		${BACKUP_DIRECTORY}	\
+		-type f 	\
+		-name 'dump-*-temp-*.tgz'	\
+		-mtime +${DAYS_OF_DIFFERENTIAL_BACKUP}	\
+		-ls	\
+		-delete	\
+		| sort -k 11
+	echo ''
+
 	CLEANED=true
 
 fi
