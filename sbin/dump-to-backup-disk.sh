@@ -131,6 +131,7 @@ for entry in	\
 	export	\
 	home	\
 	opt/local/etc	\
+	opt/retropie	\
 	usr/local/bin	\
 	usr/local/etc	\
 	usr/local/home	\
@@ -168,6 +169,8 @@ if [ ${TAR_RETURN_CODE} -ne 0 ] ; then
   log_error --stderr	\
   	"${BACKUP_TYPE} backup failed, return code ${TAR_RETURN_CODE}."
   rm -f "${DIFFERENTIAL_TOUCH_FILE}.new"
+  echo ''
+  df -H ${BACKUP_DIRECTORY}
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   # clean full back up
 
