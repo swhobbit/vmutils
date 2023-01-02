@@ -70,13 +70,12 @@ fi
 # Or just hard code gcc if you prefer it.
 if [ -x /usr/bin/clang-9 ] ; then
 	CC=clang-9
-elif [ -x /usr/bin/clang-9 ] ; then
+elif [ -x /usr/bin/clang ] ; then
 	CC=clang
 else
 	CC=gcc
 fi
 # CC=gcc
-
 
 silent=				#	--silent
 build_prefix=/usr/local
