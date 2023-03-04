@@ -6,8 +6,8 @@ DAYS_OF_DIFFERENTIAL_BACKUP=6
 BACKUP_DIRECTORY=/export/backup
 MIN_DAYS_TO_DELETE_AFTER=100
 DAYS_TO_DELETE_AFTER=365
-FULL_WEEKLY_DAYS_TO_DELETE_AFTER=90
-DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER=30
+FULL_WEEKLY_DAYS_TO_DELETE_AFTER=91
+DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER=28
 CLEANED=false
 
 # Percentage in use above which we start deleting ALL oldest backups
@@ -106,6 +106,18 @@ if [ "$(date +%d)" -le 7 ] ; then
 		-type f 	\
 		-name 'dump-*-diff.tgz'	\
 		-mtime +${DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER}	\
+		-ls	\
+		-delete	\
+		| sort -k 11
+	echo ''
+
+	# Clean up moderately old incomplete backups (leaving completed)
+	log_notice "Deleting incomplete backups older than ${DAYS_OF_DIFFERENTIAL_BACKUP} days"
+	find	\
+		${BACKUP_DIRECTORY}	\
+		-type f 	\
+		-name 'dump-*-temp-*.tgz'	\
+		-mtime +${DAYS_OF_DIFFERENTIAL_BACKUP}	\
 		-ls	\
 		-delete	\
 		| sort -k 11
