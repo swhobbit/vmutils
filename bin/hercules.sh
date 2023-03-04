@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh  
 
 # vim:	ts=8 sw=8 expandtab
 
@@ -26,9 +26,10 @@ LOG_DIRECTORY=log
 LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}.log
 OLD_LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}-$(date -r ${LOG_PATH} +%F_%H.%M.%S).log
 
-
 SYSLOG_PATH=${LOG_DIRECTORY}/syslog-${HERCULES_NAME}.log
 OLD_SYSLOG_PATH=${LOG_DIRECTORY}/syslog-${HERCULES_NAME}-$(date -r ${SYSLOG_PATH} +%F_%H.%M.%S).log
+
+SCRATCH_PATH="../scratch/${HERCULES_NAME:?'NO SYSTEM NAME SET'}/shadow"
 
 if [ -s ${LOG_PATH} ] ; then
         mv ${LOG_PATH} ${OLD_LOG_PATH}
@@ -59,7 +60,8 @@ if [ -z $(which hercules) ] ; then
   exit 98
 fi
 
-[ -d ${LOG_DIRECTORY} ]		|| mkdir -p ${LOG_DIRECTORY}
+[ -d "${SCRATCH_PATH}" ]		|| mkdir -p "${SCRATCH_PATH}"
+[ -d "${LOG_DIRECTORY}" ]		|| mkdir -p "${LOG_DIRECTORY}"
 [ -d "$(dirname ${BINARY_LINK})" ]	|| mkdir -p "$(dirname ${BINARY_LINK})"
 
 # We link to the real binary as under our system name; it makes the emulator
