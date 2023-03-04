@@ -410,10 +410,11 @@ def _ReaderPrologue(keywords,
         read_card = None
     else:
         # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
-        read_card = (f'{file_info["fname"]:8s} '
+        read_card = (':READ  '
+                     f'{file_info["fname"]:8s} '
                      f'{file_info["ftype"]:8s} '
                      f'{file_info["fmode"]:2s} '
-                     f'{socket.gethostname().upper().split(".")[0]:6s}'
+                     f'{socket.gethostname().upper().split(".")[0]:6s} '
                      f'{file_info["date"]:17s}'
                     )
 
