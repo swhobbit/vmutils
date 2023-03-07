@@ -350,7 +350,7 @@ def _UftSend(keywords,
               f'for {_CharacterSet(file_info["is_ebcdic"])} '
               f'file {file_info["fname"]}.{file_info["ftype"]} '
               f'with {file_info["length"]} bytes '
-              f'for user {keywords["login"]})')
+              f'for user {keywords["login"]}')
 
     network_socket = socket.create_connection((keywords['host'],
                                                keywords['port_uft']))
@@ -410,10 +410,11 @@ def _ReaderPrologue(keywords,
         read_card = None
     else:
         # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
-        read_card = (f'{file_info["fname"]:8s} '
+        read_card = (':READ  '
+                     f'{file_info["fname"]:8s} '
                      f'{file_info["ftype"]:8s} '
                      f'{file_info["fmode"]:2s} '
-                     f'{socket.gethostname().upper().split(".")[0]:6s}'
+                     f'{socket.gethostname().upper().split(".")[0]:6s} '
                      f'{file_info["date"]:17s}'
                     )
 
@@ -471,6 +472,8 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     fname = base_name[0]
 
     if len(base_name) == 1:
+        ftype = keywords['filetype_default']
+    elif base_name[1].isnumeric() and keywords['filetype_default']:
         ftype = keywords['filetype_default']
     else:
         ftype = base_name[1][:8]
