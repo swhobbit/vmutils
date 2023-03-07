@@ -17,6 +17,10 @@ hao cmd . vary cn(*),activate
 hao tgt IEE114A
 hao cmd /r 00,auto=n
 
+# Wait for mounts 
+hao tgt ([0-9]{2}) IEF864D REPLY 'RETRY' OR 'CANCEL' OR 'WAIT'
+hao cmd /r $1,wait
+
 # Vary MVS console online if no master console found (mostly seen on
 # slow host systems at start up). Must use CONSOLE and not MSTCONS
 hao tgt IEE141A MASTER AND ALL ALTERNATES UNAVAILABLE
@@ -25,7 +29,7 @@ hao cmd /V 010,CONSOLE
 # If we lose the syslog, route the log to the printer log.
 # (Doesn't work because of non-master console authority issues.)
 hao tgt IEE143I  01F NOW RECEIVING HARDCOPY, REASON=HCSW
-hao cmd /V 30E,HARDCPY
+hao cmd /V 30E,HARDCPY,STCMDS,ROUT=ALL
 
 # Automatically route any TAP network device to the local live subnet
 hao tgt HHCLC055I (tap[0-9]+)
@@ -33,7 +37,7 @@ hao cmd sh hercules_route_lcs.py -d $1 $(HERCULES_NAME).oat
 
 # Respond to our not very secret master password prompt
 hao tgt ([0-9]{2}) IEC301A S JOB .+ DSNAME SYS1.VMASTCAT
-hao cmd /$1 $(HERCULES_MASTCAT)
+hao cmd /r $1,$(HERCULES_MASTCAT)
 
 # We run most base disk R/O so the shadow file merge below never wipes the
 # first generation; live updates go into the second generation.
