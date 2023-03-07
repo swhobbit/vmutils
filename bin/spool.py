@@ -21,7 +21,7 @@ the number of separator page lines to 1:
 """
 
 __author__ = "ahd@kew.com (Drew Derbyshire)"
-__version__ = "1.1.2"
+__version__ = "1.1.4"
 
 import os
 import re
@@ -38,7 +38,7 @@ _JES2_PATTERN = (
     r'\*{4,4}'                              # ****
     r'(?P<class>[A-Z0-9])'                  # sysout class
     r'  (?P<edge>START| END )'              # START/END
-    r'  (?P<type>JOB|STC|TSU)'              # JOB/TSU/STC
+    r'  (?P<queue>JOB|STC|TSU)'             # JOB/TSU/STC
     r' (?P<number>[ \d]{4,4})'              # job number
     r'  (?P<name>[A-Z0-9@#$ ]{8,8})'        # job name
     r'  (.{20,20})'                         # programmer name
@@ -47,7 +47,7 @@ _JES2_PATTERN = (
     r' \d\d [A-Z]{3,3} \d\d'                # date: dd mmm yy
     r'  ([\w ]{8,8})'                       # printer name
     r'  SYS (?P<system>[\w ]{4,4})'         # system name
-    r'  (?P=type)'                          # JOB/TSU/STC
+    r'  (?P=queue)'                         # JOB/TSU/STC
     r' (?P=number)'                         # job number
     r'  (?P=edge)'                          # START/END
     r'  (?P=class)'                         # sysout class
@@ -66,19 +66,19 @@ _HASP_PATTERN = (
     r'(?P<class>[A-Z0-9])'                  # sysout class
     r'\*'                                   # Literal
     r'(?P<printer>[\w ]{8,8})'              # printer name
-    r'\.{4,4}'                            # Literal
+    r'\.{4,4}'                              # Literal
     r'(?P<edge>START|\.\.END)'              # START/END
-    r' (?P<type>JOB|STC|TSU)'               # JOB/TSU/STC
+    r' (?P<queue>JOB|STC|TSU)'              # JOB/TSU/STC
     r' (?P<number>[ \d]{4,4})'              # job number
     r'\.{4,4}'                              # Literal
-    r'[.\d]\d(?:\.\d\d){2,2} (?:A|P)M'    # time: hh:mm:ss AM/PM
-    r' [ \d]\d [A-Z]{3,3} \d\d'                # date: dd mmm yy
+    r'[.\d]\d(?:\.\d\d){2,2} (?:A|P)M'      # time: hh:mm:ss AM/PM
+    r' [ \d]\d [A-Z]{3,3} \d\d'             # date: dd mmm yy
     r'\.{4,4}'                              # Literal
     r'ROOM (?P<room>[\w ]{4,4})'            # room number
     r'\.{4,4}'                              # Literal
     r'(?P<name>[A-Z0-9@#$ ]{8,8})'          # job name
     r'\.{4,4}'                              # Literal
-    r'(?P<pgmr>.{20,20})'                 # programmer name
+    r'(?P<pgmr>.{20,20})'                   # programmer name
     r'\.{4,4}'                              # Literal
     r'([\w ]{8,8})'                         # printer name
     r'\*'                                   # Literal
@@ -95,7 +95,7 @@ def _GetLine():
     try:
       c = sys.stdin.read(1)
     except (UnicodeDecodeError) as e:
-      print("Failure reading character:", str(e))
+      print("Failure reading character:", str(e), file=sys.stderr)
       c = '?'
 
     if not c:
@@ -108,71 +108,85 @@ def _GetLine():
 
 def _Process():
   """Main processing loop.  Never exits until program shutdown."""
-  buffer = []
+  file_buffer = []
+  page_buffer = []
+  separator_page = False
   eof = False
   dictionary = {}
+  line = True
 
-  while True:
+  while line:
     line = _GetLine()
 
     # Handle EOF when we have data buffered
-    if not line:
-      if buffer:
-        type = 'XXX'
-        if not os.path.exists(type):
-          os.makedirs(type)
+    if not line and not dictionary and not eof:
+      if file_buffer or page_buffer:
+        queue = 'XXX'
+        if not os.path.exists(queue):
+          os.makedirs(queue)
 
         for i in range(1, 1000):
-          output_name = type + '/' + 'UNKNOWN' + '.' + str(i) + '.txt'
+          output_name = queue + '/' + 'UNKNOWN.listing' + str(i)
           if not os.path.exists(output_name):
             break
         with open(output_name, 'w') as f:
-          f.write(''.join(buffer))
+          f.write(''.join(file_buffer + page_buffer))
       return
+
 
     matches = re.match(_JES2_REGEX, line.strip())
     if not matches:
       matches = re.match(_HASP_REGEX, line.strip())
 
     if matches:
-      buffer.append(line)
+      separator_page = True
+      page_buffer.append(line)
       dictionary = matches.groupdict()
       eof = 'END' in dictionary['edge']
-    elif dictionary and eof and line.startswith('\f'):
-      output_base = '-'.join((
-          dictionary['name'],
-          dictionary['number'].replace(' ', '0'),
+    elif dictionary and eof and (not line or line.startswith('\f')):
+      output_base = ''.join((
+          dictionary['name'].replace('$', '_').replace('/', '-'), '.',
+          'listing', '-',
+          dictionary['number'].replace(' ', '0'), '-',
           dictionary['class'])).replace(' ', '')
-      output_base = output_base.replace('$', '_').replace('/', '-')
-      output_name = output_base + '.txt'
+      output_base = '/'.join((dictionary['queue'], output_base))
 
-      if not os.path.exists(dictionary['type']):
-        os.makedirs(dictionary['type'])
+      if not os.path.exists(dictionary['queue']):
+        os.makedirs(dictionary['queue'])
 
+      output_name = output_base
       for i in range(1, 1000):
-        output_name = dictionary['type'] + '/' + output_base + '.' + str(i) + '.txt'
         if not os.path.exists(output_name):
           break
+        output_name = output_base + '-' + str(i)
+
       with open(output_name, 'w') as f:
-        f.write(''.join(buffer))
-      print(sys.argv[0], 'Wrote', output_name, 'with', len(buffer), 'lines')
-      buffer = []
+        f.write(''.join(file_buffer))
+      print(sys.argv[0], 'Wrote', output_name, 'with', len(file_buffer), 'lines', file=sys.stderr)
+      file_buffer = []
+      separator_page = False
       dictionary = {}
     else:
+      if line.startswith('\f'):
+        if separator_page:
+          separator_page = False
+        else:
+          file_buffer += page_buffer
+        page_buffer = []
       dictionary = {}
-      buffer.append(line)
+      page_buffer.append(line)
 
 
 def Main():
   """Main program to invoke _Process."""
-  print(sys.argv[0], 'Version', __version__, 'Started ...')
+  print(sys.argv[0], 'Version', __version__, 'Started ...', file=sys.stderr)
   if len(sys.argv) > 1:
     os.chdir(sys.argv[1])
   else:
     os.chdir('prt')
-  print('Current directory now', os.getcwd())
+  print('Current directory now', os.getcwd(), file=sys.stderr)
   _Process()
-  print(sys.argv[0], 'EOF!!!')
+  print(sys.argv[0], 'EOF!!!', file=sys.stderr)
 
 if __name__ == '__main__':
   sys.exit(Main())
