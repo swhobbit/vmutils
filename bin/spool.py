@@ -2,8 +2,9 @@
 
 # vim:  ts=2 sw=2 expandtab
 
-"""Split HASP/JES2 spool output running in MVS under a Hercules emulated
-machine into individual files based on their trailing JES2 banner.
+"""Split HASP/JES2 spool output running in MVS or MVT w/HASP under a
+Hercules emulated machine into individual files based on their trailing
+JES2 banner.
 
 Module written November, 2016.
 
@@ -21,7 +22,7 @@ the number of separator page lines to 1:
 """
 
 __author__ = "ahd@kew.com (Drew Derbyshire)"
-__version__ = "1.1.5"
+__version__ = "1.1.6"
 
 from datetime import datetime
 import os
@@ -232,12 +233,11 @@ def _Process():
           dictionary = matches.groupdict()
           dictionary.setdefault('number', '9999') # WTR files have no number
           _CloseFile(file_handle)
+          file_handle = None
 
           # We only open files for START banner pages; at the end,
           # we ignore it, having already closed the file.
-          if 'END' in dictionary['edge']:
-            file_handle = None
-          else:
+          if 'END' not in dictionary['edge']:
             file_handle = _OpenFile(dictionary)
           break
 
