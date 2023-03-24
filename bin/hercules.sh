@@ -74,5 +74,8 @@ fi
 
 ln -s "$(which hercules)" "${BINARY_LINK}"
 
+# Save time future for setting the clock on OS/MVT
+export HERCULES_IPL_TIME="$(date +date=$(expr $(date +%y) + 100 - 28).%j,clock=%H.%M.%S)"
+
 echo "${BINARY_LINK}" -f ${HERCULES_NAME}.conf "|" datestamp ">" ${LOG_PATH}
 "${BINARY_LINK}" -f ${HERCULES_NAME}.conf | datestamp.sh > ${LOG_PATH}
