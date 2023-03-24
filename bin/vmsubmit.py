@@ -14,7 +14,7 @@ import socket
 import sys
 import time
 
-__version__ = '1.2.6'
+__version__ = '1.2.7'
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 __copyright__ = ('Version ' + __version__ + '. '
                  'Copyright 2018-2022 by Kendra Electronic Wonderworks. '
@@ -44,7 +44,7 @@ def _ParseCommandLine(command_line):
     return ivalue
 
   def _StringToken(value):
-    """Convert passed value to an uppper case string and verify it."""
+    """Convert passed value to an upper case string and verify it."""
     ivalue = value.upper()
     if not value:
       raise argparse.ArgumentTypeError(
@@ -77,7 +77,7 @@ def _ParseCommandLine(command_line):
       '--debug',
       default=False,
       action='store_true',
-      help='Report addtional debugging information about the transfer '
+      help='Report additional debugging information about the transfer '
       '(Default: %(default)s)')
   parser.add_argument(
       '-l',
@@ -90,10 +90,10 @@ def _ParseCommandLine(command_line):
   parser.add_argument(
       '-H',
       '--host',
-      default='hercules',
+      default='Hercules',
       help='The TCP/IP hostname of the server to connect to; '
       'files are delivered to '
-      'the specified login on this host unless the UFT or RCSCS options '
+      'the specified login on this host unless the UFT or RSCS options '
       'are specified '
       '(Default: %(default)s)',
       type=socket.gethostbyname,
@@ -395,7 +395,7 @@ def _ReaderPrologue(keywords,
     is_os = True
 
   if is_os:
-    print(f'Processsing '
+    print(f'Processing '
         f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
         'in OS mode.')
 
@@ -644,7 +644,7 @@ def _Main():
   for current in args.file:
     if not first:
       # Allow Hercules side networking/IO to catch up, else the file may
-      # get rejected by hercules (which reports no error back to us!).
+      # get rejected by Hercules (which reports no error back to us!).
       time.sleep(keywords['sleep'])
       first = False
 
