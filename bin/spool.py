@@ -145,8 +145,14 @@ def _GetLine():
   while True:
     try:
       c = sys.stdin.read(1)
+    except (KeyboardInterrupt) as e:
+      print("Interrupt:", str(e), file=sys.stderr)
+      sys.stderr.flush()
+      # Try again recursively.
+      return _GetLine()
     except (UnicodeDecodeError) as e:
       print("Failure reading character:", str(e), file=sys.stderr)
+      sys.stderr.flush()
       c = '?'
 
     if not c:
@@ -197,6 +203,7 @@ def _OpenFile(dictionary, sequence, lines_in):
   print('Opening output file', output_name,
         'after', lines_in or 'no', 'lines read',
          file=sys.stderr)
+  sys.stderr.flush()
   return open(output_name, 'w')
 
 def _CloseFile(file_handle, lines_out, lines_in):
@@ -206,6 +213,7 @@ def _CloseFile(file_handle, lines_out, lines_in):
           lines_out or "no", 'lines written (input had',
           lines_in or "no", "total lines in)",
           file=sys.stderr)
+    sys.stderr.flush()
     file_handle.close()
 
 def _ScanForBanner(line, new_page, last_regex):
@@ -248,7 +256,7 @@ def _Process():
     new_page = form_feed
     form_feed = '\f' in line
 
-    # At EOF, flush any current page (unless a banner page) and exit
+    # At EOF, write any current page (unless a banner page) and exit
     if not line:
       if page_buffer and not banner_page:
         if not file_handle:
@@ -271,12 +279,14 @@ def _Process():
           # If input did not start with a banner page, we need to
           # open an anonymous file now that we have the first page
           print('New file for:\n', '->'.join(page_buffer), file=sys.stderr)
+          sys.stderr.flush()
           sequence = sequence + 1
           file_handle = _OpenFile({}, sequence, lines_in)
 
         file_handle.write(''.join(page_buffer))
+        file_handle.flush()
 
-      # Having printed/flushed the previous page, start a new one
+      # Having printed/discarded the previous page, start a new one
       page_buffer = []
 
     page_buffer.append(line)
@@ -302,13 +312,16 @@ def _Process():
 def Main():
   """Main program to invoke _Process."""
   print(sys.argv[0], 'Version', __version__, 'Started ...', file=sys.stderr)
+  sys.stderr.flush()
   if len(sys.argv) > 1:
     os.chdir(sys.argv[1])
   else:
     os.chdir('prt')
   print('Current directory now', os.getcwd(), file=sys.stderr)
+  sys.stderr.flush()
   _Process()
   print(sys.argv[0], '\nEOF!\n', file=sys.stderr)
+  sys.stderr.flush()
 
 if __name__ == '__main__':
   sys.exit(Main())
