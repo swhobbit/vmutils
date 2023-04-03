@@ -6,5 +6,6 @@ fi
 read message
 while [ $? -eq 0 ] ; do
 	echo "$(date +"${DATE_FORMAT:-%F}") ${message}"
+	trap 'continue' 2
 	read message
 done
