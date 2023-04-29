@@ -17,7 +17,7 @@ import time
 __version__ = '1.2.7'
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 __copyright__ = ('Version ' + __version__ + '. '
-                 'Copyright 2018-2022 by Kendra Electronic Wonderworks. '
+                 'Copyright 2018-2023 by Kendra Electronic Wonderworks. '
                  'All commercial rights reserved.\n'
                 )
 
