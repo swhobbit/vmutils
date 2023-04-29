@@ -395,9 +395,9 @@ def _ReaderPrologue(keywords,
     is_os = True
 
   if is_os:
-    print(f'Processing '
-        f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
-        'in OS mode.')
+    print('Processing '
+          f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
+          'in OS mode.')
 
   if keywords['remote_node']:
     # Remote user via RSCS
