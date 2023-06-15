@@ -68,9 +68,7 @@ fi
 ###
 
 # Or just hard code gcc if you prefer it.
-if [ -x /usr/bin/clang-9 ] ; then
-	CC=clang-9
-elif [ -x /usr/bin/clang ] ; then
+if [ -x /usr/bin/clang ] ; then
 	CC=clang
 else
 	CC=gcc
@@ -93,7 +91,6 @@ declare -a build_optimizations
 declare -a gcc_build_optimizations
 
 build_options=(
-	"${build_options[@]}"
 	"CC=${CC}"
 	"--prefix=${build_prefix}"
 	"--enable-custom=${CUSTOM}"
@@ -116,8 +113,7 @@ gcc_build_optimizations=(
 	)
 
 if [ "hyperion" = "${EDITION}" ] ; then
-	build_options=(
-		"${build_options[@]}"
+	build_options+=(
 		"--enable-extpkgs=${build_prefix}"
 		)
 fi
@@ -130,8 +126,7 @@ elif [ "GNU/Linux" != "$(uname -o)" ] ; then
 	exit 97
 else
 	# We assume Raspberry Pi ARM
-	build_optimizations=(
-		"${build_optimizations[@]}"
+	build_optimizations+=(
 		"-mfloat-abi=hard"
 		)
 
@@ -140,40 +135,38 @@ else
 	MODEL="$(sed -E -e 's/Model.+: Raspberry Pi (Compute Module )?([0-9]|Zero).+$/\2/' <<< "$(grep '^Model'	/proc/cpuinfo)" )"
 
 	if [ "Zero" = "${MODEL}" ] || [ "1" -eq "${MODEL}" ]; then
-		build_optimizations=(
-			"${build_optimizations[@]}"
+		build_optimizations+=(
 			"-mcpu=arm1176jzf-s"
 			"-mtune=arm1176jzf-s"
 			"-mfpu=vfp"
 			"-mtune=arm1176jzf-s"
 			)
 	elif [ "2" -eq "${MODEL}" ] ; then
-		build_optimizations=(
+		build_optimizations+=(
 			"-mcpu=cortex-a7"
 			"-mfloat-abi=hard"
 			"-mfpu=neon-vfpv4"
 			"-mtune=cortex-a7"
 		)
 	elif [ "3" -eq "${MODEL}" ] ; then
-		build_optimizations=(
-			"${build_optimizations[@]}"
+		build_optimizations+=(
 			"-mcpu=cortex-a53"
 			"-mtune=cortex-a53"
 			)
-		gcc_build_optimizations=(
-			"${gcc_build_optimizations[@]}"
+		gcc_build_optimizations+=(
 			"-mneon-for-64bits"
 			)
 	elif [ "4" -eq "${MODEL}" ] ; then
-		build_optimizations=(
-			"${build_optimizations[@]}"
+		build_optimizations+=(
 			"-mcpu=cortex-a72"
 			"-mtune=cortex-a72"
 			"-mfpu=neon-fp-armv8"
 		)
-		gcc_build_optimizations=(
-			"${gcc_build_optimizations[@]}"
+		gcc_build_optimizations+=(
 			"-mneon-for-64bits"
+			)
+		build_options+=(
+			"--build=armv7l-unknown-linux-gnu"
 			)
 	elif [ "" = "${MODEL}" ] ; then
 		echo "$0 doesn't know how to read model on OS $(uname -o) on $(uname -m)!"
@@ -185,8 +178,7 @@ else
 fi
 
 if [ ${CC} = "gcc" ] ; then
-	build_optimizations=(
-		"${build_optimizations[@]}"
+	build_optimizations+=(
 		"${gcc_build_optimizations[@]}"
 		)
 fi
