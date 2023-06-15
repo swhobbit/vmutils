@@ -22,7 +22,11 @@ the number of separator page lines to 1:
 """
 
 __author__ = "ahd@kew.com (Drew Derbyshire)"
-__version__ = "1.1.6"
+__version__ = "1.1.7"
+__copyright__ = ('Version ' + __version__ + '. '
+                 'Copyright 2020-2023 by Kendra Electronic Wonderworks. '
+                 'All commercial rights reserved.\n'
+                )
 
 from datetime import datetime
 import os
@@ -138,6 +142,11 @@ _NOBANNER_PATTERN = (
 )
 _NOBANNER_REGEX = re.compile(_NOBANNER_PATTERN)
 
+def _EPrint(*text):
+  """Print a line to STDDERR and flush it."""
+  print(f'{os.path.basename(sys.argv[0])}:', *text, file=sys.stderr)
+  sys.stderr.flush()
+
 def _GetLine():
   """Read one line of sysout from the input"""
   line = ''
@@ -146,13 +155,11 @@ def _GetLine():
     try:
       c = sys.stdin.read(1)
     except (KeyboardInterrupt) as e:
-      print("Interrupt:", str(e), file=sys.stderr)
-      sys.stderr.flush()
+      _EPrint("Interrupt:", str(e))
       # Try again recursively.
       return _GetLine()
     except (UnicodeDecodeError) as e:
-      print("Failure reading character:", str(e), file=sys.stderr)
-      sys.stderr.flush()
+      _EPrint("Failure reading character:", str(e))
       c = '?'
 
     if not c:
@@ -200,19 +207,17 @@ def _OpenFile(dictionary, sequence, lines_in):
       break
     output_name = output_base + '-' + str(i)
 
-  print('Opening output file', output_name,
-        'after', lines_in or 'no', 'lines read',
-         file=sys.stderr)
+  _EPrint('Opening output file', output_name,
+          'after', lines_in or 'no', 'lines read')
   sys.stderr.flush()
-  return open(output_name, 'w')
+  return open(output_name, 'w', encoding='utf-8')
 
 def _CloseFile(file_handle, lines_out, lines_in):
   """Close a file handle if needed."""
   if file_handle:
-    print('Closing output file with',
-          lines_out or "no", 'lines written (input had',
-          lines_in or "no", "total lines in)",
-          file=sys.stderr)
+    _EPrint('Closing output file with',
+            lines_out or "no", 'lines written (input had',
+            lines_in or "no", "total lines in)")
     sys.stderr.flush()
     file_handle.close()
 
@@ -278,8 +283,7 @@ def _Process():
         if not file_handle:
           # If input did not start with a banner page, we need to
           # open an anonymous file now that we have the first page
-          print('New file for:\n', '->'.join(page_buffer), file=sys.stderr)
-          sys.stderr.flush()
+          _EPrint('New file for:\n', '->'.join(page_buffer))
           sequence = sequence + 1
           file_handle = _OpenFile({}, sequence, lines_in)
 
@@ -311,17 +315,22 @@ def _Process():
 
 def Main():
   """Main program to invoke _Process."""
-  print(sys.argv[0], 'Version', __version__, 'Started ...', file=sys.stderr)
-  sys.stderr.flush()
+  _EPrint('Version', __version__, 'Started ...')
+
   if len(sys.argv) > 1:
-    os.chdir(sys.argv[1])
+    directory = sys.argv[1]
   else:
-    os.chdir('prt')
-  print('Current directory now', os.getcwd(), file=sys.stderr)
-  sys.stderr.flush()
+    directory = 'print'
+
+  try:
+    os.mkdir(directory)
+  except FileExistsError:
+    pass
+
+  os.chdir(directory)
+  _EPrint('Current spool directory now', os.getcwd())
   _Process()
-  print(sys.argv[0], '\nEOF!\n', file=sys.stderr)
-  sys.stderr.flush()
+  _EPrint('EOF!\n')
 
 if __name__ == '__main__':
   sys.exit(Main())
