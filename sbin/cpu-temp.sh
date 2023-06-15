@@ -33,9 +33,9 @@ else
 	DELTA=`expr ${NEW_TEMP} - ${OLD_TEMP}`
 fi
 
-# Report save and new temperature if it's up or down two degrees since
-# we last reported and saved it.
-if [ ${DELTA} -ge 2000 ]
+# Report save and new temperature if it's up or down one full degree
+# since we last reported and saved it.
+if [ ${DELTA} -ge 1000 ]
 then
 	printf 'CPU temperature %d.%d%s'	\
 		$(expr ${NEW_TEMP} / 1000)	\
