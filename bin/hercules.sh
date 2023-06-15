@@ -21,23 +21,15 @@
 # *                    Kenmore, WA                                     *
 # *------------------------------------------------------------------- *
 
+set xtrace
+
 BINARY_LINK="${HOME}/bin/hercules.d/${HERCULES_NAME:?'NO SYSTEM NAME SET'}"
 LOG_DIRECTORY=log
 LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}.log
-OLD_LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}-$(date -r ${LOG_PATH} +%F_%H.%M.%S).log
 
 SYSLOG_PATH=${LOG_DIRECTORY}/syslog-${HERCULES_NAME}.log
-OLD_SYSLOG_PATH=${LOG_DIRECTORY}/syslog-${HERCULES_NAME}-$(date -r ${SYSLOG_PATH} +%F_%H.%M.%S).log
 
 SCRATCH_PATH="../scratch/${HERCULES_NAME:?'NO SYSTEM NAME SET'}/shadow"
-
-if [ -s ${LOG_PATH} ] ; then
-        mv ${LOG_PATH} ${OLD_LOG_PATH}
-fi
-
-if [ -s ${SYSLOG_PATH} ] ; then
-        mv ${SYSLOG_PATH} ${OLD_SYSLOG_PATH}
-fi
 
 # Check if we're already running under screen.
 SCREEN_COUNT="`screen -ls ${HERCULES_NAME} | fgrep -w -c ${HERCULES_NAME}`"
@@ -69,10 +61,24 @@ fi
 # path to the real binary may have changed locations.
 
 if [ -x "${BINARY_LINK}" ]; then
-	rm "${BINARY_LINK}"
+	rm "${BINARY_LINK}" || ( sleep 5; exit 99)
 fi
 
-ln -s "$(which hercules)" "${BINARY_LINK}"
+ln -s "$(which hercules)" "${BINARY_LINK}" || (sleep 5 ; exit 99)
+
+if [ -s ${LOG_PATH} ] ; then
+        OLD_LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}-$(date -r ${LOG_PATH} +%F_%H.%M.%S).log
+        mv ${LOG_PATH} ${OLD_LOG_PATH}
+else
+        echo "No old ${LOG_PATH} exists.
+fi
+
+if [ -s ${SYSLOG_PATH} ] ; then
+        OLD_SYSLOG_PATH=${LOG_DIRECTORY}/syslog-${HERCULES_NAME}-$(date -r ${SYSLOG_PATH} +%F_%H.%M.%S).log
+        mv ${SYSLOG_PATH} ${OLD_SYSLOG_PATH}
+else 
+        echo "No old ${SYSLOG_PATH} exists.
+fi
 
 # Save time future for setting the clock on OS/MVT
 export HERCULES_IPL_TIME="$(date +date=$(expr $(date +%y) + 100 - 28).%j,clock=%H.%M.%S)"
