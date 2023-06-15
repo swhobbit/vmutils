@@ -17,7 +17,7 @@ import time
 __version__ = '1.2.7'
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 __copyright__ = ('Version ' + __version__ + '. '
-                 'Copyright 2018-2022 by Kendra Electronic Wonderworks. '
+                 'Copyright 2018-2023 by Kendra Electronic Wonderworks. '
                  'All commercial rights reserved.\n'
                 )
 
@@ -395,9 +395,9 @@ def _ReaderPrologue(keywords,
     is_os = True
 
   if is_os:
-    print('Processing '
-          f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
-          'in OS mode.')
+    print(f'Processing '
+        f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
+        'in OS mode.')
 
   if keywords['remote_node']:
     # Remote user via RSCS
