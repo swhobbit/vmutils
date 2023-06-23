@@ -23,24 +23,27 @@ else
 fi
 
 # Also get current temperature
-read NEW_TEMP < ${TEMPERATURE_FILE}
+read RAW_TEMP < ${TEMPERATURE_FILE}
 
 # Compute positive delta between the lower and higher temperatures
-if [ ${OLD_TEMP} -ge ${NEW_TEMP} ]
+if [ ${OLD_TEMP} -ge ${RAW_TEMP} ]
 then
-	DELTA=`expr ${OLD_TEMP} - ${NEW_TEMP}`
+	DELTA=`expr ${OLD_TEMP} - ${RAW_TEMP}`
 else
-	DELTA=`expr ${NEW_TEMP} - ${OLD_TEMP}`
+	DELTA=`expr ${RAW_TEMP} - ${OLD_TEMP}`
 fi
 
 # Report save and new temperature if it's up or down one full degree
 # since we last reported and saved it.
-if [ ${DELTA} -ge 1000 ]
+if [ ${DELTA} -ge ${1:-1000} ]
 then
-	printf 'CPU temperature %d.%d%s'	\
-		$(expr ${NEW_TEMP} / 1000)	\
-		$(expr $(expr ${NEW_TEMP} % 1000) / 100)	\
-		'ᴼC'	\
-		| logger --id=$$ -t ${BASENAME} -p daemon.info
-	echo ${NEW_TEMP} > ${ROOT_NAME}
+	RAW_TEMP=$(expr ${RAW_TEMP} + 5)
+	CPU_TEMP="$(printf '%d.%02d°C' $(expr ${RAW_TEMP} / 1000) $(expr $(expr ${RAW_TEMP} % 1000) / 10) )"
+	printf 'CPU temperature %s'	\
+		${CPU_TEMP}	\
+			| logger	\
+				--id=$$	\
+				--tag ${BASENAME}	\
+				--priority daemon.info
+	echo ${RAW_TEMP} > ${ROOT_NAME}
 fi
