@@ -21,8 +21,6 @@
 # *                    Kenmore, WA                                     *
 # *------------------------------------------------------------------- *
 
-set xtrace
-
 BINARY_LINK="${HOME}/bin/hercules.d/${HERCULES_NAME:?'NO SYSTEM NAME SET'}"
 LOG_DIRECTORY=log
 LOG_PATH=${LOG_DIRECTORY}/hercules-${HERCULES_NAME}.log
@@ -83,5 +81,11 @@ fi
 # Save time future for setting the clock on OS/MVT
 export HERCULES_IPL_TIME="$(date +date=$(expr $(date +%y) + 100 - 28).%j,clock=%H.%M.%S)"
 
-echo "${BINARY_LINK}" -f ${HERCULES_NAME}.conf "|" datestamp ">" ${LOG_PATH}
-"${BINARY_LINK}" -f ${HERCULES_NAME}.conf | datestamp.sh > ${LOG_PATH}
+if fgrep --silent -i datestamp ${HERCULES_NAME}.conf ; then
+        echo "${BINARY_LINK}" -f ${HERCULES_NAME}.conf ">" ${LOG_PATH}
+        exec "${BINARY_LINK}" -f ${HERCULES_NAME}.conf > ${LOG_PATH}
+else 
+        # Spinhawk (old) hercules, no date on log info
+        echo "${BINARY_LINK}" -f ${HERCULES_NAME}.conf "|" datestamp ">" ${LOG_PATH}
+        "${BINARY_LINK}" -f ${HERCULES_NAME}.conf | datestamp.sh > ${LOG_PATH}
+fi
