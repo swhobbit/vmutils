@@ -40,7 +40,7 @@
 # setenv	HERCULES_WEB		# Hercules web console/documentation
 
 setenv	HERCULES_MASTCAT	secret	# DEFAULT for master catalog on MVS 3.8 
-setenv	HERCULES_VERSION	spinhawk	# spinhawk or hyperion
+setenv	HERCULES_VERSION	hyperion	# spinhawk or hyperion
 
 source hercules.environment
 
