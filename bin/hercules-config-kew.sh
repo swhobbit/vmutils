@@ -73,7 +73,7 @@ if [ -x /usr/bin/clang ] ; then
 else
 	CC=gcc
 fi
-# CC=gcc
+CC=gcc
 
 silent=				#	--silent
 build_prefix=/usr/local
@@ -127,7 +127,7 @@ elif [ "GNU/Linux" != "$(uname -o)" ] ; then
 else
 	# We assume Raspberry Pi ARM
 	build_optimizations+=(
-		"-mfloat-abi=hard"
+		# "-mfloat-abi=hard"
 		)
 
 	# Raspberry Pi ARM has many flavors, we customize by model.
@@ -144,7 +144,6 @@ else
 	elif [ "2" -eq "${MODEL}" ] ; then
 		build_optimizations+=(
 			"-mcpu=cortex-a7"
-			"-mfloat-abi=hard"
 			"-mfpu=neon-vfpv4"
 			"-mtune=cortex-a7"
 		)
@@ -154,16 +153,16 @@ else
 			"-mtune=cortex-a53"
 			)
 		gcc_build_optimizations+=(
-			"-mneon-for-64bits"
+			# "-mneon-for-64bits"
 			)
 	elif [ "4" -eq "${MODEL}" ] ; then
 		build_optimizations+=(
 			"-mcpu=cortex-a72"
 			"-mtune=cortex-a72"
-			"-mfpu=neon-fp-armv8"
+			# "-mfpu=neon-fp-armv8"
 		)
 		gcc_build_optimizations+=(
-			"-mneon-for-64bits"
+			# "-mneon-for-64bits"
 			)
 		build_options+=(
 			"--build=armv7l-unknown-linux-gnu"
