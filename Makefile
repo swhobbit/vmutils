@@ -12,7 +12,7 @@ cron/%:  /etc/cron.d/%
 sbin/%:  /usr/local/sbin/%
 	cp -f "$<" "$@"
 
-bin/%:  ${HOME}/bin/%
+bin/%:  ${HOME}/hercules/common/%
 	cp -f "$<" "$@"
 
 common/%: ${HOME}/hercules/common/%

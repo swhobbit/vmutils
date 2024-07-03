@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+### #!/usr/bin/env PYTHONIOENCODING=ISO-8859-1 python3
 
 #         vim:  ts=2 sw=2 expandtab
 
@@ -10,7 +11,7 @@ Module written November, 2016.
 
 To use, insert into the Hercules configuration:
 
-    000E    1403    |${HOME}/bin/spool.py
+    000E    1403    |../common/spool.py
 
 where 000E is the address of a JES2 controlled printer with separator
 pages enabled.
@@ -22,15 +23,17 @@ the number of separator page lines to 1:
 """
 
 __author__ = "ahd@kew.com (Drew Derbyshire)"
-__version__ = "1.1.7"
+__version__ = "1.1.10"
 __copyright__ = ('Version ' + __version__ + '. '
-                 'Copyright 2020-2023 by Kendra Electronic Wonderworks. '
+                 'Copyright 2022-2023 by Kendra Electronic Wonderworks. '
                  'All commercial rights reserved.\n'
                 )
 
 from datetime import datetime
 import os
 import re
+import select
+import signal
 import sys
 
 # pylint: disable=C0301
@@ -43,20 +46,30 @@ import sys
 _JES2_PATTERN = (
     r'\*{4,4}'                              # ****
     r'(?P<class>[A-Z0-9])'                  # sysout class
-    r'  (?P<edge>START| END )'              # START/END
-    r'  (?P<queue>JOB|STC|TSU)'             # JOB/TSU/STC
-    r' (?P<number>[ \d]{4,4})'              # job number
-    r'  (?P<jobname>[A-Z0-9@#$ ]{8,8})'     # job name
-    r'  (.{20,20})'                         # programmer name
+    r'  '
+    r'(?P<edge>START| END )'                # START/END
+    r'  '
+    r'(?P<queue>JOB|STC|TSU)'               # JOB/TSU/STC
+    r' '
+    r'(?P<number>[ \d]{4,4})'               # job number
+    r'  '
+    r'(?P<jobname>[A-Z0-9@  #$ ]{8,8})'     # job name
+    r'  '
+    r'(.{20,20})'                           # programmer name
     r'  ROOM (?P<room>[\w ]{4,4})'          # room number
     r'  [ \d]\d(?:\.\d\d){2,2} (?:A|P)M'    # time: hh:mm:ss AM/PM
     r' \d\d [A-Z]{3,3} \d\d'                # date: dd mmm yy
-    r'  ([\w ]{8,8})'                       # printer name
+    r'  '
+    r'([\w ]{8,8})'                         # printer name
     r'  SYS (?P<node>[\w ]{4,4})'           # system SMF name
-    r'  (?P=queue)'                         # JOB/TSU/STC
-    r' (?P=number)'                         # job number
-    r'  (?P=edge)'                          # START/END
-    r'  (?P=class)'                         # sysout class
+    r'  '
+    r'(?P=queue)'                           # JOB/TSU/STC
+    r' '
+    r'(?P=number)'                          # job number
+    r'  '
+    r'(?P=edge)'                            # START/END
+    r'  '
+    r'(?P=class)'                           # sysout class
     r'\*{4,4}'                              # ****
 )
 _JES2_REGEX = re.compile(_JES2_PATTERN)
@@ -74,8 +87,10 @@ _HASP_PATTERN = (
     r'(?P<printer>[\w ]{8,8})'              # printer name
     r'\.{4,4}'                              # Literal
     r'(?P<edge>START|\.\.END)'              # START/END
-    r' (?P<queue>JOB|STC|TSU)'              # JOB/TSU/STC
-    r' (?P<number>[ \d]{4,4})'              # job number
+    r' '
+    r'(?P<queue>JOB|STC|TSU)'               # JOB/TSU/STC
+    r' '
+    r'(?P<number>[ \d]{4,4})'               # job number
     r'\.{4,4}'                              # Literal
     r'[.\d]\d(?:\.\d\d){2,2} (?:A|P)M'      # time: hh:mm:ss AM/PM
     r' [ \d]\d [A-Z]{3,3} \d\d'             # date: dd mmm yy
@@ -109,14 +124,16 @@ _WTR_PATTERN = (
     r'(?P<node>[ \w]{4,4})'                 # system SMF id
     r'   '                                  # Literal
     r'(?P<queue>WTR|JOB|STC|TSU)'           # WTR JOB/TSU/STC
-    r' (?P<printer>[\w ]{3,3})'             # printer address (name)
+    r' '
+    r'(?P<printer>[\w ]{3,3})'              # printer address (name)
     r'   '                                  # Literal
     r'[ \d]\d(:\d\d){2,2} (?:A|P)M'         # time: hh:mm:ss AM/PM
     r'  '                                   # Literal
     r'[ \d]\d [A-Z]{3,3} \d{4,4}'           # date: dd mmm yyyy
     r'   '                                  # Literal
     r'(?P=queue)'                           # WTR
-    r' (?P=printer)'                        # printer address (name)
+    r' '
+    r'(?P=printer)'                         # printer address (name)
     r'   SYS '                              # Literal
     r'(?P=node)'                            # system SMF id
     r'   '                                  # Literal
@@ -134,41 +151,83 @@ _WTR_REGEX = re.compile(_WTR_PATTERN)
 #       //INIT     JOB MSGLEVEL=1
 #       ....+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9....+....*....+....1....+....2....+....3..
 
-_NOBANNER_PATTERN = (
+_MVT_NOBANNER_PATTERN = (
     r'(//|IEF452I )(?P<jobname>[A-Z0-9@#$]+)' # jobname or failure of some job
     r' +JOB '                                # it's a JOB statement
 #   r'.*(MSGCLASS=(?P<class>[A-Z0-9]))?'     # which MAYBE has a class
     r'.*'                                    # Unparsed trailing
 )
-_NOBANNER_REGEX = re.compile(_NOBANNER_PATTERN)
+_MVT_NOBANNER_REGEX = re.compile(_MVT_NOBANNER_PATTERN)
+
+# pylint: disable=C0301
+#       ....+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9....+....*....+....1....+....2....+....3..#
+#       1 //AHDILIST JOB AHD,'DERBYSHIRE-IEHLIST',                                JOB00874
+#       ....+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8....+....9....+....*....+....1....+....2....+....3..
+
+_ZOS_NOBANNER_PATTERN = (
+    r'1 '
+    r'(//?P<jobname>[A-Z0-9@#$]+)'          # jobname or failure of some job
+    r' +JOB '                                # it's a JOB statement
+    r'.+'                                   # DEBUG
+)
+
+DUMMY = (
+    r'.{20,70}'                              # Unparsed trailing
+    r'(?P<queue>JOB|STC|TSU)'                # JOB/TSU/STC
+    r'(?P<number>[ \d]{5,5})'
+)
+_ZOS_NOBANNER_REGEX = re.compile(_ZOS_NOBANNER_PATTERN)
+
 
 def _EPrint(*text):
-  """Print a line to STDDERR and flush it."""
+  """Print a line to STDERR and flush it."""
   print(f'{os.path.basename(sys.argv[0])}:', *text, file=sys.stderr)
   sys.stderr.flush()
 
-def _GetLine():
-  """Read one line of sysout from the input"""
+class GracefulKiller:
+  """Handle external shudown request"""
+  kill_now = False
+
+  def __init__(self):
+    signal.signal(signal.SIGINT, self.SetKilled)
+    signal.signal(signal.SIGTERM, self.SetKilled)
+
+  # pylint: disable=W0613
+  def SetKilled(self, number, stack_frame):
+    """Process signal"""
+    match number:
+
+      case signal.SIGINT:
+        number = 'SIGINT'
+
+      case signal.signal.SIGTERM:
+        number = 'SIGTERM'
+
+    _EPrint(f'Killed by signal {number}.')
+    self.kill_now = True
+
+def _GetLine(killer):
+  """Read one line of SYSOUT from the input"""
   line = ''
+  c = '?'
 
-  while True:
-    try:
-      c = sys.stdin.read(1)
-    except (KeyboardInterrupt) as e:
-      _EPrint("Interrupt:", str(e))
-      # Try again recursively.
-      return _GetLine()
-    except (UnicodeDecodeError) as e:
-      _EPrint("Failure reading character:", str(e))
-      c = '?'
+  while not killer.kill_now and c not in ('\n', '\f', None, ''):
 
-    if not c:
-      return line
-    if c == '\r':
-      c = '\n'
-    line += c
-    if c in ('\n', '\f'):
-      return line
+    if select.select([sys.stdin, ], [], [], 10.0)[0]:
+      # We have data to read
+      try:
+        c = sys.stdin.read(1)
+      except (UnicodeDecodeError) as e:
+        _EPrint("Failure reading character:", str(e))
+        c = '?'
+
+      if c:
+        if c == '\r':
+          c = '\n'
+        line += c
+
+  return line
+
 
 def _OpenFile(dictionary, sequence, lines_in):
   """Open a new spool based on provided job information."""
@@ -207,18 +266,18 @@ def _OpenFile(dictionary, sequence, lines_in):
       break
     output_name = output_base + '-' + str(i)
 
-  _EPrint('Opening output file', output_name,
-          'after', lines_in or 'no', 'lines read')
-  sys.stderr.flush()
+  _EPrint('Opening file', output_name,
+          'after', lines_in or 'no', 'total input lines')
   return open(output_name, 'w', encoding='utf-8')
 
 def _CloseFile(file_handle, lines_out, lines_in):
   """Close a file handle if needed."""
   if file_handle:
-    _EPrint('Closing output file with',
-            lines_out or "no", 'lines written (input had',
-            lines_in or "no", "total lines in)")
-    sys.stderr.flush()
+    _EPrint('Closing file',
+            file_handle.name,
+            'with',
+            lines_out or "no", 'lines written (total has had',
+            lines_in or "no", "input lines)")
     file_handle.close()
 
 def _ScanForBanner(line, new_page, last_regex):
@@ -230,8 +289,12 @@ def _ScanForBanner(line, new_page, last_regex):
 
   # Only search for the raw JCL starting a job if starting a page AND
   # we not yet seen a real banner page.
-  if new_page and last_regex is _NOBANNER_REGEX:
-    regex_list.append(last_regex)
+  if new_page:
+    if last_regex:
+      regex_list.append(last_regex)
+    else:
+      regex_list.append(_ZOS_NOBANNER_REGEX)
+      regex_list.append(_MVT_NOBANNER_REGEX)
 
   for regex in regex_list:
     matches = re.match(regex, line.strip())
@@ -252,17 +315,18 @@ def _Process():
   lines_out = 0
   lines_in = 0
   line = True
+  killer = GracefulKiller()
 
-  last_regex = _NOBANNER_REGEX
+  last_regex = None
   sequence = 10000
 
   while line:
-    line = _GetLine()
+    line = _GetLine(killer)
     new_page = form_feed
     form_feed = '\f' in line
 
     # At EOF, write any current page (unless a banner page) and exit
-    if not line:
+    if killer.kill_now or not line:
       if page_buffer and not banner_page:
         if not file_handle:
           file_handle = _OpenFile({}, sequence + 1, lines_in)
@@ -277,7 +341,7 @@ def _Process():
     #  print/flush any previous page when we see top of form
     if '\f' in line and (page_buffer and page_buffer != ['\n']):
       if banner_page:
-        # We flush (not print) banner pages
+        # We ignore (not print) banner pages
         banner_page = False
       else:
         if not file_handle:
@@ -295,7 +359,7 @@ def _Process():
 
     page_buffer.append(line)
 
-    # Look for a banner which starts end a new file.
+    # Look for a banner which starts or ends a new file.
     if not banner_page:
       (dictionary, last_regex) = _ScanForBanner(line, new_page, last_regex)
 
@@ -321,6 +385,8 @@ def Main():
     directory = sys.argv[1]
   else:
     directory = 'print'
+
+  sys.stdin.reconfigure(encoding='ascii', errors='replace')
 
   try:
     os.mkdir(directory)

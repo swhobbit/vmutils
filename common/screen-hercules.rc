@@ -1,4 +1,4 @@
-#!/usr/bin/screen -c
+#!/usr/bin/screen -c 
 
 # vim: ts=8 noexpandtab sts=8
 
@@ -13,7 +13,7 @@
 # variables in it, mostly used by the hercules.sh and hercules.conf for a
 # particular machine and shell scripts run in support of it. This script
 # needs the HERCULES_NAME name set both to set the name for locking used
-# by ${HOME}/bin/hercules.sh and to set the LPAR name.
+# by ../common/hercules.sh and to set the LPAR name.
 
 # setenv  HERCULES_NAME		# The name machine is known by (directory)
 # setenv  HERCULES_CPU		# Number of CPUs, default is 1
@@ -27,19 +27,20 @@
 # setenv  HERCULES_RSCS		# Local RSCS name
 
 # setenv  HERCULES_EPOCH	# Use 1960 with systems not patched for Y2K
-# setenv  HERCULES_YROFFSET	# Use -28 with systems not patched for Y2K
+# setenv  HERCULES_YROFFSET	# Use -28 with systems not patched for Y2K 
 
 # Our common configuration expects the following ports defined; they MUST
 # be unique for each Hercules instance run simultaneously on same host. We
 # tend to use 3270n, 1442n, 2540n and 808n, where n is the same digit for
-# a single emulated machine.
+# a single emulated machine. (Or use unique host names)
 
 # setenv	HERCULES_CONSOLE	# 3270 port for console and TSO
 # setenv	HERCULES_ASCII_READER	# Port for data sent in ASCII
-# setenv	HERCULES_EBCDIC_READER	# Port for data sent in EBCDIC
+# setenv	HERCULES_EBCDIC_READER	# Port for data sent in EBCDIC 
 # setenv	HERCULES_WEB		# Hercules web console/documentation
 
-setenv	HERCULES_MASTCAT	secret	# DEFAULT for master catalog on MVS 3.8
+setenv	HERCULES_MASTCAT	secret	# DEFAULT for master catalog on MVS 3.8 
+setenv	HERCULES_VERSION	hyperion	# spinhawk or hyperion
 
 source hercules.environment
 
@@ -49,8 +50,10 @@ defscrollback	1000
 hardstatus	alwayslastline "%{Rk} %S %{kW} %h %n%f %t %= %H%? %l %{Rk} %S "
 nethack		on
 sessionname	${HERCULES_NAME}
-setenv		HERCULES_RC      ../common/hercules-under-screen.rc
 startup_message off
+
+setenv		HERCULES_RC	../common/hercules-under-screen.rc 
+setenv		PATH		"/usr/local/${HERCULES_VERSION}/bin:$PATH}"
 
 # Run the primary hercules task. The wrapper script will setup
 # directories, take out the log trash, verify the hercules binary exists,
@@ -60,4 +63,4 @@ startup_message off
 # fire off the associated 3270 console, log viewers, and printer tasks
 # (if any)
 
-screen -t hercules 0 ${HOME}/bin/hercules.sh
+screen -t hercules 0 ../common/hercules.sh 

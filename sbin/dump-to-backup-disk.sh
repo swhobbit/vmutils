@@ -10,10 +10,10 @@ MYNAME="`basename $0`"
 
 
 # Log an message to system log; may also log to system error if --stderr passed
-log_message () { 
+log_message () {
 	priority=$1
-	shift 
-  	 
+	shift
+
 	logger	\
 		--id=$$ \
 		--tag=${MYNAME}	\
@@ -38,11 +38,11 @@ is_directory_fs_root () {
 	root_directory=${1:?["No directory supplied."]}
 
 	# Check backup directory is its own file system
-	if mount | fgrep -q " ${root_directory} " ; then 
+	if mount | fgrep -q " ${root_directory} " ; then
 	 	# directory is its own file system
-	 	return 0 
-	else 
-		# directory is a child directory 
+	 	return 0
+	else
+		# directory is a child directory
 		return 1
 	fi
 }
@@ -62,9 +62,9 @@ if [ -f ${BACKUP_DIRECTORY}/NO_BACKUP ] ; then
 fi
 
 # Check backup directory is its own file system
-if is_directory_fs_root  ${BACKUP_DIRECTORY} ; then 
+if is_directory_fs_root  ${BACKUP_DIRECTORY} ; then
  : No operation, backup directory is its own file system, which is good.
-else 
+else
  log_error "Backup directory ${BACKUP_DIRECTORY} is not mounted on its own file system, exiting."
  exit 99
 fi
@@ -102,12 +102,13 @@ fi
 
 cd /
 DIRECTORIES=""
-# Determine what directories to backup.  
+# Determine what directories to backup.
 #
 # (That it is, don't call cause errors by trying to backup things which
 # do not exist on the current system.
 
-# Directories only backed up only if the root of their own file system
+# Directories only backed up only if the root of their own file system;
+# otherwise they get backed up as part of their parent file system.
 for entry in	\
       export/git	\
       home/hercules
@@ -118,11 +119,11 @@ for entry in	\
     fi
   done
 
-# Directories/files which backed up unconditionally (if they exist).  
+# Directories/files which backed up unconditionally (if they exist).
 #
 # NOTE: The directories are not de-dupped by tar; for example, if
 #       fee/fie is on the same file system as fee, it will get
-#       backed up twice. 
+#       backed up twice.
 for entry in	\
 	boot/grub	\
 	boot/*.txt	\
@@ -162,7 +163,7 @@ TAR_RETURN_CODE=$?
 # If backup is clean, and we have a new differential timestamp, make it
 # the real one.
 
-if [ ${TAR_RETURN_CODE} -ne 0 ] ; then 
+if [ ${TAR_RETURN_CODE} -ne 0 ] ; then
   # failed back up of any type
 
   echo ''
@@ -173,18 +174,24 @@ if [ ${TAR_RETURN_CODE} -ne 0 ] ; then
   df -H ${BACKUP_DIRECTORY}
 elif [ -f "${DIFFERENTIAL_TOUCH_FILE}.new" ] ; then
   # clean full back up
+  mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}"
+  mv ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-temp-${BACKUP_TYPE}.tgz \
+	${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
 
   echo ''
-  mv "${DIFFERENTIAL_TOUCH_FILE}.new" "${DIFFERENTIAL_TOUCH_FILE}" 
-  mv ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-temp-${BACKUP_TYPE}.tgz \
-  	${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
-  ls -l -h ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
+  /usr/local/sbin/pi-temp.sh
+  echo ''
   log_notice --stderr	\
-  	"${BACKUP_TYPE} backup complete,"	\
-	"and will be the baseline for differential backups."
+	"$(hostname) ${BACKUP_TYPE} backup complete,"	\
+	"and it will be the baseline for differential backups."
+
+  echo ''
+  ls -l -h ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-${BACKUP_TYPE}.tgz
+
   echo ''
   df -H ${BACKUP_DIRECTORY}
-else 
+
+else
   # clean differential back up
 
   mv ${BACKUP_DIRECTORY}/dump-$(hostname -s)-${NOW}-temp-${BACKUP_TYPE}.tgz \

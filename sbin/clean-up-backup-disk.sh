@@ -1,20 +1,23 @@
 #/bin/sh
 MY_NAME="$(basename $0)"
 SECONDS_PER_DAY=86400
-DAYS_OF_DIFFERENTIAL_BACKUP=6
-
 BACKUP_DIRECTORY=/export/backup
-MIN_DAYS_TO_DELETE_AFTER=100
-DAYS_TO_DELETE_AFTER=365
-FULL_WEEKLY_DAYS_TO_DELETE_AFTER=91
-DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER=28
+
 CLEANED=false
+CLEANUP_TOUCH_FILE="${BACKUP_DIRECTORY}/status-clean-$(hostname -s).touch"
+DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER=28
+DAYS_OF_CLEANUP=$(date +%d)
+DAYS_OF_DIFFERENTIAL_BACKUP=6
+FULL_WEEKLY_DAYS_TO_DELETE_AFTER=91
+MIN_DAYS_TO_DELETE_AFTER=60
 
 # Percentage in use above which we start deleting ALL oldest backups
 HIGH_WATER_PERCENT_IN_USE=90
+
 # Once we start deleting all backups, delete down to this percentage
 # in use
-LOW_WATER_PERCENT_IN_USE="$(expr ${HIGH_WATER_PERCENT_IN_USE} \* 3 / 4)"
+LOW_WATER_PERCENT_IN_USE=80
+
 
 # Log an message to system log; if --stderr passed, will also log to stderr
 log_message () {
@@ -34,6 +37,7 @@ log_error () {
 	log_message error --stderr "${@:?'No error message specified'}"
 }
 
+
 # Log a notice message to both system log and stderr
 log_notice () {
 	log_message notice --stderr "${@:?'No notice specified'}"
@@ -49,11 +53,17 @@ is_directory_fs_root () {
 	return $?
 }
 
+
 # Report amount in use by directory
 file_system_percent_in_use() {
 	target_directory=${1:?'No directory supplied.'}
 	echo `df ${target_directory} | awk '/dev/ {print $5}' | sed -e 's/%//'`
 }
+
+
+#
+#	Begin main program
+#
 
 
 if [ ! -d ${BACKUP_DIRECTORY} ] ; then
@@ -81,10 +91,22 @@ if [ 0 -ne $? ] ; then
 	exit 2
 fi
 
+# Delete obsolete (over CLEANUP_TOUCH_FILE days old) touch files (which
+# will force a monthly clean of back files every CLEANUP_TOUCH_FILE +
+# 1 days).
+find	\
+	"$(dirname ${CLEANUP_TOUCH_FILE} )"	\
+	-name "$(basename ${CLEANUP_TOUCH_FILE} ) " \
+	-mtime +${DAYS_OF_CLEANUP}	\
+	-daystart	\
+	-ls	\
+	-delete
+
 # Do monthly optional clean up; if we're truly low on space when we are
-# not doing this clean up, some of these files may get scrubbed anywayc
+# not doing this clean up, some of these files may get scrubbed anyway
 # below.
-if [ "$(date +%d)" -le 7 ] ; then
+if [ ! -f ${CLEANUP_TOUCH_FILE} ] ; then
+	log_notice "DEEP CLEAN"
 
 	# Clean up moderately old weekly backups of all types (leaving monthly)
 	log_notice "Deleting weekly backups older than ${FULL_WEEKLY_DAYS_TO_DELETE_AFTER} days"
@@ -94,6 +116,7 @@ if [ "$(date +%d)" -le 7 ] ; then
 		-name 'dump-*.tgz'	\
 		! -name 'dump-*-????-??-0[1-7]_*.tgz'	\
 		-mtime +${FULL_WEEKLY_DAYS_TO_DELETE_AFTER}	\
+		-daystart	\
 		-ls	\
 		-delete	\
 		| sort -k 11
@@ -106,6 +129,7 @@ if [ "$(date +%d)" -le 7 ] ; then
 		-type f 	\
 		-name 'dump-*-diff.tgz'	\
 		-mtime +${DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER}	\
+		-daystart	\
 		-ls	\
 		-delete	\
 		| sort -k 11
@@ -118,6 +142,7 @@ if [ "$(date +%d)" -le 7 ] ; then
 		-type f 	\
 		-name 'dump-*-temp-*.tgz'	\
 		-mtime +${DAYS_OF_DIFFERENTIAL_BACKUP}	\
+		-daystart	\
 		-ls	\
 		-delete	\
 		| sort -k 11
@@ -125,6 +150,11 @@ if [ "$(date +%d)" -le 7 ] ; then
 
 	CLEANED=true
 
+	touch "${CLEANUP_TOUCH_FILE}"
+else 
+	log_notice "No deep clean performed"
+	ls -l "${CLEANUP_TOUCH_FILE}"
+	echo ' '
 fi
 
 # Determine date of oldest full backup
@@ -149,6 +179,7 @@ do
 		-name "dump-*.tgz"	\
 		-type f	\
 		-mtime +${DAYS_TO_DELETE_AFTER}	\
+		-daystart	\
 		-ls	\
 		-delete	\
 		| sort -k 11

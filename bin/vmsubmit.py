@@ -1,39 +1,53 @@
 #!/usr/bin/env python3
+
 # -*- coding: UTF-8 -*-
 # vim: ts=2 sw=2 expandtab
 
 """Send a text file to a user via the VM reader or UTF protocol"""
 
 import argparse
+import enum
+import ftplib
+from ftplib import FTP
 import getpass
 from http import client
 from http import HTTPStatus
+import io
 from os import path
 import os
 import socket
 import sys
 import time
 
-__version__ = '1.2.7'
+__version__ = '1.3.1'
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 __copyright__ = ('Version ' + __version__ + '. '
-                 'Copyright 2018-2023 by Kendra Electronic Wonderworks. '
+                 'Copyright 2018-2024 by Kendra Electronic Wonderworks. '
                  'All commercial rights reserved.\n'
                 )
 
 TRANSLATE_TABLE = None
 
-ASCII_DEFAULT_PORT = int(os.getenv('HERCULES_ASCII_READER',
-                   default='14425'))
-EBCDIC_DEFAULT_PORT = int(os.getenv('HERCULES_EBCDIC_READER',
-                  default='25405'))
-UFT_DEFAULT_PORT = 608
+ASCII_DEFAULT_PORT = int(os.getenv('HERCULES_ASCII_READER', default='1442'))
+EBCDIC_DEFAULT_PORT = int(os.getenv('HERCULES_EBCDIC_READER', default='2540'))
+UFT_DEFAULT_PORT = int(os.getenv('HERCULES_SIFT_PORT', default='608')) 
+FTP_DEFAULT_PORT = socket.getservbyname('ftp')
+
+class Transport(enum.StrEnum):
+  """Choices for our transport protocol"""
+  FTP = 'FTP'
+  RDR = 'RDR'
+  UFT = 'UFT'
 
 # We LIKE how we preface internal routines with underscores.
 # pylint: disable=C0103
 
 def _ParseCommandLine(command_line):
   """Parse program arguments"""
+
+  def _TransportUpper(member):
+    """Look up Transport enum based on upper case string param."""
+    return Transport(member.upper())
 
   def _PositiveInteger(value):
     """Convert passed value to a positive integer and verify it."""
@@ -60,43 +74,85 @@ def _ParseCommandLine(command_line):
   parser = argparse.ArgumentParser(
       description='Transmit a file to a user on VM '
       '(or connected via a VM system) either via '
-      'a networked emulated system reader (the default) or '
+      'a networked emulated system reader (the default), FTP or '
       'via the Sender-Initiated/Unsolicited File Transfer (SIFT/UFT) '
       'protocol as (incompletely) defined in RFC 1440.',
       epilog=__copyright__
   )
-  exclusive_port_flags = parser.add_mutually_exclusive_group()
 
-  parser.add_argument(
-      '-v',
-      '--version',
-      action='version',
-      version='%(prog)s ' + __version__)
-  parser.add_argument(
-      '-d',
-      '--debug',
-      default=False,
-      action='store_true',
-      help='Report additional debugging information about the transfer '
-      '(Default: %(default)s)')
-  parser.add_argument(
-      '-l',
-      '--login',
-      default=getpass.getuser().upper(),
-      help='User login id to send file to '
-      '(Default: %(default)s)',
-      type=_StringToken,
-  )
   parser.add_argument(
       '-H',
       '--host',
       default='Hercules',
       help='The TCP/IP hostname of the server to connect to; '
       'files are delivered to '
-      'the specified login on this host unless the UFT or RSCS options '
-      'are specified '
+      'the specified login on this host unless the UFT or remote node options '
+      'are specified. '
       '(Default: %(default)s)',
       type=socket.gethostbyname,
+  )
+  parser.add_argument(
+      '-p',
+      '--port',
+      default=0,
+      metavar='PORT',
+      help='The TCP port number of the system to send the file via. '
+      '(Default: '
+      f'{ASCII_DEFAULT_PORT} for ASCII reader files, '
+      f'{EBCDIC_DEFAULT_PORT} for EBCDIC reader files, '
+      f'{FTP_DEFAULT_PORT} for FTP connections, '
+      f'and {UFT_DEFAULT_PORT} for UFT connections)',
+      type=_PositiveInteger,
+  )
+  parser.add_argument(
+      '-l',
+      '--login',
+      '--user',
+      '--id',
+      default=getpass.getuser().upper(),
+      help='User login id to send file to. '
+      '(Default: %(default)s)',
+      type=_StringToken,
+  )
+  parser.add_argument(
+      '-P',
+      '--password',
+      '--passwd',
+      help='FTP Password of login id to send file to. '
+      ' Not used by RDR or UFT transports. '
+      '(Default: %(default)s)',
+      type=_StringToken,
+  )
+  parser.add_argument(
+      '-a',
+      '--account',
+      '--acct',
+      default=None,
+      help='FTP Account (minidisk password) of login id to send file to. '
+      ' Not used by RDR or UFT transports. '
+      '(Default: %(default)s)',
+      type=_StringToken,
+  )
+  parser.add_argument(
+      '-r',
+      '--remote_node',
+      default=None,
+      metavar='REMOTE_NODE',
+      help='The node name that the file is forwarded to via RSCS '
+      'after receipt on the TCP/IP server host. '
+      '(Default: %(default)s, that is deliver on the TCP/IP server host.)',
+      type=_StringToken,
+  )
+  transports = ', '.join(list(Transport))
+  parser.add_argument(
+      '-T',
+      '--transport',
+      type=_TransportUpper,
+      default=Transport.RDR,
+      choices=[f'{choice}' for choice in Transport],
+      help=f'One of the connection protocols of {transports} '
+      'to send the file via. '
+      '(Default: %(default)s)'
   )
   parser.add_argument(
       '-t',
@@ -113,7 +169,7 @@ def _ParseCommandLine(command_line):
       '--filemode',
       default='A1',
       metavar='FM',
-      help='Filemode (class) to spool file as '
+      help='Filemode (class) to spool file as.'
       '(Default: %(default)s)',
       type=_StringToken,
   )
@@ -124,21 +180,10 @@ def _ParseCommandLine(command_line):
       default=False,
       action='store_true',
       help='Transmit the file (which must already be in EBCDIC), '
-      'via the EBCDIC reader port or UTF mode E '
+      'via the EBCDIC reader port, FTP binary mode, or UTF mode E. '
       '(Default: %(default)s, except this option is automatically '
       'enabled for files of type VMARC and XMI, '
       'which are always in EBCDIC.)'
-  )
-  parser.add_argument(
-      '-u',
-      '--uft',
-      dest='is_uft',
-      default=False,
-      action='store_true',
-      help='Connect to the specified UFT port on the TCP/IP server '
-      'rather than to a reader port, '
-      'and use the UFT protocol to send the file. '
-      '(Default: %(default)s)'
   )
   parser.add_argument(
       '-o',
@@ -149,22 +194,12 @@ def _ParseCommandLine(command_line):
       action='store_true',
       help='The target system is running OS/360 (or a successor), '
       'not VM. '
-      'To avoid mucking things up on such a system, '
+      'To avoid mucking things up on such an OS-based system, '
       'no VM READ header card will preface the file. '
       '(Default: %(default)s, '
       'except that this option is automatically enabled for '
-      'remote systems with MVS in their name '
+      'remote systems with OS or MVS in their name '
       'and for files of type XMI, JCL, or JOB.)'
-  )
-  parser.add_argument(
-      '-r',
-      '--remote_node',
-      default=None,
-      metavar='REMOTE_NODE',
-      help='The node name that the file is forwarded to via RSCS '
-      'after receipt on the TCP/IP server host. '
-      '(Default: %(default)s, that is deliver to the local host.)',
-      type=_StringToken,
   )
   parser.add_argument(
       '-R',
@@ -176,35 +211,6 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_StringToken,
   )
-  exclusive_port_flags.add_argument(
-      '-A',
-      '--port_ascii',
-      default=ASCII_DEFAULT_PORT,
-      metavar='APORT',
-      help='The TCP port number of the reader for ASCII '
-      'files on the TCP/IP server host. '
-      '(Default: %(default)s)',
-      type=_PositiveInteger,
-  )
-  exclusive_port_flags.add_argument(
-      '-E',
-      '--port_ebcdic',
-      metavar='EPORT',
-      default=EBCDIC_DEFAULT_PORT,
-      help='The TCP port number of the reader for EBCDIC'
-      ' files on the TCP/IP server host. '
-      '(Default: %(default)s)',
-      type=_PositiveInteger,
-  )
-  exclusive_port_flags.add_argument(
-      '-U',
-      '--port_uft',
-      metavar='UPORT',
-      default=UFT_DEFAULT_PORT,
-      help='The TCP port number to send UTF/SIFT files via. '
-      '(Default: %(default)s)',
-      type=_PositiveInteger,
-  )
   parser.add_argument(
       '-s',
       '--sleep',
@@ -215,12 +221,36 @@ def _ParseCommandLine(command_line):
       type=_PositiveInteger,
   )
   parser.add_argument(
+    '-d',
+    '--debug',
+    default=0,
+    action='count',
+    help='Report additional debugging information about the transfer. '
+    '(Default: %(default)s)')
+  parser.add_argument(
+      '-v',
+      '--version',
+      action='version',
+      version='%(prog)s ' + __version__)
+  parser.add_argument(
       'file',
       nargs='+',
       help='File(s) to send to VM',
       type=str,
   )
   return parser.parse_args(command_line)
+
+
+def _HostName(keywords, port=False):
+  """Format hostname, host IP address, and port for messages."""
+  if port:
+    return (f'{socket.gethostbyaddr(keywords["host"])[0]}:'
+            f'{keywords["port"]} '
+            f'({keywords["host"]})')
+
+  return (f'{socket.gethostbyaddr(keywords["host"])[0]}:'
+          f'{keywords["port"]} '
+          f'({keywords["host"]})')
 
 def _Send(network_socket, buffer, debug, translate=False):
   """Write buffer, translating if needed and making strings bytes."""
@@ -241,7 +271,14 @@ def _Send(network_socket, buffer, debug, translate=False):
     if debug:
       print(f'Sending {len(buffer)} data bytes')
 
-  network_socket.sendall(buffer)
+  for offset in range(0, len(buffer), 4096):
+    network_socket.send(buffer[offset:offset + 4096])
+    if debug:
+      print(offset, flush=True)
+    time.sleep(0.20)
+
+  if debug:
+    print('')
 
 
 def _Expect(network_socket, prompt, expected, debug):
@@ -337,7 +374,7 @@ def _UftPrologue(keywords,
 def _UftSend(keywords,
        file_info,
        data_buffer):
-  """Send a file via a remote UFT server"""
+  """Send a file to the IBM host via a remote UFT server"""
 
   if not file_info['is_ebcdic']:
     # Internet protocol is \r\n for new lines.
@@ -345,15 +382,21 @@ def _UftSend(keywords,
     file_info['length'] = len(data_buffer)
 
   if keywords['debug']:
-    print(f'Opening UFT host {keywords["host"]} '
-        f'port {keywords["port_uft"]} '
+    print(f'Opening UFT host {_HostName(keywords, port=True)} '
         f'for {_CharacterSet(file_info["is_ebcdic"])} '
         f'file {file_info["fname"]}.{file_info["ftype"]} '
         f'with {file_info["length"]} bytes '
         f'for user {keywords["login"]})')
 
-  network_socket = socket.create_connection((keywords['host'],
-                         keywords['port_uft']))
+  try:
+    network_socket = socket.create_connection(
+        (keywords['host'],
+         keywords['port']))
+  except (OSError) as ex:
+    print('Connection to '
+          f'{_HostName(keywords, port=True)} failed.',
+          ex)
+    sys.exit(ex.errno)
 
   try:
     _UftPrologue(keywords,
@@ -371,9 +414,9 @@ def _UftSend(keywords,
   finally:
     try:
       network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
+      network_socket.close()
     except (OSError, ConnectionResetError) as ex:
-      print('Error during shutdown of socket:', ex)
-    network_socket.close()
+      print('Error during shutdown/close of UFT socket:', ex)
     print('File '
           f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
           'sent via UFT')
@@ -395,32 +438,33 @@ def _ReaderPrologue(keywords,
     is_os = True
 
   if is_os:
-    print('Processing '
-          f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
-          'in OS mode.')
+    print(f'Processing '
+        f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
+        'in OS mode.')
 
   if keywords['remote_node']:
     # Remote user via RSCS
-    id_card = (f'USERID {keywords["rscs_vm"]:8s} '
-           f'CLASS {file_info["fmode"]:1s} '
-           f'NAME {file_info["fname"]:8s} {file_info["ftype"]:8s}')
-    tag_card = f'{keywords["remote_node"]:8s} {keywords["login"]:8s}'
+    id_card = (f'USERID {keywords["rscs_vm"]:8.8s} '
+           f'CLASS {file_info["fmode"]:1.1s} '
+           f'NAME {file_info["fname"]:8.8s} {file_info["ftype"]:8.8s}')
+    tag_card = f'{keywords["remote_node"]:8.8s} {keywords["login"]:8.8s}'
   else:
     # Local user
-    id_card = (f'USERID {keywords["login"]:8s} '
-           f'CLASS {file_info["fmode"]:1s} '
-           f'NAME {file_info["fname"]:8s} {file_info["ftype"]:8s}')
+    id_card = (f'USERID {keywords["login"]:8.8s} '
+           f'CLASS {file_info["fmode"]:1.1s} '
+           f'NAME {file_info["fname"]:8.8s} {file_info["ftype"]:8.8s}')
     tag_card = None
 
   if is_os:
     read_card = None
   else:
     # :READ  PROFILE  EXEC     A1 AHD191 03/18/18 16:18:44
+    disk_label = socket.gethostname().upper().split('.')[0].split('-')[0]
     read_card = (':READ  '
-           f'{file_info["fname"]:8s} '
-           f'{file_info["ftype"]:8s} '
-           f'{file_info["fmode"]:2s} '
-           f'{socket.gethostname().upper().split(".")[0]:6s} '
+           f'{file_info["fname"]:8.8s} '
+           f'{file_info["ftype"]:8.8s} '
+           f'{file_info["fmode"]:2.2s} '
+           f'{disk_label:6.6s} '
            f'{file_info["date"]:17s}'
           )
 
@@ -436,22 +480,22 @@ def _ReaderPrologue(keywords,
 def _ReaderSend(keywords,
         file_info,
         data_buffer):
-  """Send a file to a remote VM virtual (network) reader"""
-
-  if file_info['is_ebcdic']:
-    port = keywords['port_ebcdic']
-  else:
-    port = keywords['port_ascii']
+  """Send a file to the IBM host via a networked VM virtual reader"""
 
   if keywords['debug']:
-    print(f'Opening VM reader on host {keywords["host"]} '
-        f'port {port} '
+    print(f'Opening VM reader on host {_HostName(keywords, port=True)} '
         f'for {_CharacterSet(file_info["is_ebcdic"])} file '
         f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
         f'for user {keywords["login"]}')
 
-  network_socket = socket.create_connection((keywords['host'],
-                         port))
+  try:
+    network_socket = socket.create_connection((keywords['host'],
+                                               keywords['port']))
+  except (OSError, ConnectionRefusedError) as ex:
+    print(f'Connection to {_HostName(keywords, port=True)} reader failed.',
+          ex)
+    sys.exit(ex.errno)
+
   try:
     _ReaderPrologue(keywords,
             file_info,
@@ -461,12 +505,103 @@ def _ReaderSend(keywords,
   finally:
     try:
       network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
+      network_socket.close()
     except (OSError, ConnectionResetError) as ex:
-      print('Error during shutdown of socket:', ex)
-    network_socket.close()
+      print('Error during shutdown/close of reader socket:', ex)
+      # sys.exit(ex.errno)
+
     print('File '
           f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
-          'sent via reader')
+          'sent to '
+          f'{_HostName(keywords)} '
+          'via reader')
+
+
+def _FTPSend(keywords,
+            file_info,
+            data_buffer):
+  """Send a file to the IBM host via FTP"""
+
+  if keywords['debug']:
+    print(f'Opening VM reader on host {_HostName(keywords, port=True)} '
+        f'for {_CharacterSet(file_info["is_ebcdic"])} file '
+        f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
+        f'for user {keywords["login"]}')
+
+  if 'password' not in keywords or not keywords['password']:
+    print('Password not provided for', keywords['transport'])
+    sys.exit(89)
+
+  connection = FTP()
+
+  if keywords['debug']:
+    connection.set_debuglevel(min(keywords['debug'], 2))
+
+  try:
+    connection.connect(host=keywords['host'], port=keywords['port'])
+  except (OSError, ConnectionRefusedError) as ex:
+    print(f'Connection to {_HostName(keywords, port=True)} reader failed.',
+          ex)
+    sys.exit(ex.errno)
+
+  try:
+    if 'account' in keywords:
+      connection.login(user=keywords['login'],
+                       passwd=keywords['password'],
+                       acct=keywords['account'])
+      # Send the account provided, to act as minidisk 191 password.
+      connection.sendcmd(f'ACCT {keywords["account"]}')
+    else:
+      connection.login(user=keywords['login'], passwd=keywords['password'])
+  except (ftplib.error_perm,) as ex:
+    print(f'Login to {_HostName(keywords)} failed:', ex)
+    sys.exit(96)
+
+  text = connection.sendcmd('SYST').replace('-', ' ').splitlines()[0]
+  token = text.split(maxsplit=4)
+  print(text)
+
+  match token[0:4]:
+    case ('215','MVS','Type:','L8'):
+      print('System',
+            _HostName(keywords),
+            'is running MVS/370 3.8 (not supported)')
+      sys.exit(97)
+
+    case ('215', 'VM/ESA', _, _) | ('215', 'VM', _, _) if not keywords['account']:
+      print('System',
+             _HostName(keywords),
+             'is running VM and no account was supplied.')
+      sys.exit(96)
+
+    case ('215', 'VM/ESA', _, _) | ('215', 'VM', _, _):
+      pass
+
+    case ('215', 'MVS', _, _):
+      pass
+
+    case _:
+      print('System', _HostName(keywords), 'is running unsupported', token[1])
+      sys.exit(95)
+
+  if keywords['debug']:
+    print('System', _HostName(keywords), 'is running', token[1])
+
+  stor_command = (f'STOR '
+                  f'{file_info["fname"]}.'
+                  f'{file_info["ftype"]}.'
+                  f'{file_info["fmode"]}')
+
+  if file_info['is_ebcdic']:
+    with io.BytesIO(initial_bytes=data_buffer) as handle:
+      connection.storbinary(stor_command, handle)
+  else:
+    byte_buffer = bytes.fromhex(''.join([f'{ord(x):02x}'
+                                         for x in data_buffer]))
+    with io.BytesIO(initial_bytes=byte_buffer) as handle:
+      connection.storbinary(stor_command, handle)
+
+    connection.storlines(stor_command, handle)
 
 
 def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
@@ -474,6 +609,16 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
   file_path = path.abspath(path.expanduser(file_path))
   length = path.getsize(file_path)
   date = time.strftime('%D %T', time.localtime(path.getmtime(file_path)))
+
+  _DEFAULT_PORT = {
+    Transport.FTP: FTP_DEFAULT_PORT,
+    Transport.RDR: (ASCII_DEFAULT_PORT,
+                    EBCDIC_DEFAULT_PORT)[keywords['ebcdic']],
+    Transport.UFT: UFT_DEFAULT_PORT
+  }
+
+  if not keywords['port']:
+    keywords['port'] = _DEFAULT_PORT[keywords['transport']]
 
   base_name = path.basename(file_path).replace('_', '$').upper()
   base_name = base_name.strip().strip('.').split('.')
@@ -486,9 +631,6 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
   fmode = keywords['filemode'][:2]
 
   is_ebcdic = keywords['ebcdic'] or ftype in ('VMARC', 'XMI')
-  is_ebcdic = is_ebcdic or keywords['port_ebcdic'] != EBCDIC_DEFAULT_PORT
-
-  is_uft = keywords['is_uft'] or keywords['port_uft'] != UFT_DEFAULT_PORT
 
   if is_ebcdic and length % 80:
     raise RuntimeError(f'Length of file {file_path} '
@@ -500,7 +642,10 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     with open(file_path, 'rb') as file_handle:
       data_buffer = file_handle.read()
   else:
-    with open(file_path, 'rt', encoding='utf-8') as file_handle:
+    with open(file_path,
+              'rt',
+              encoding='utf-8',
+              errors='replace') as file_handle:
       data_buffer = file_handle.read()
 
   # Insure any ASCII file ends with a new line, unless it was completely
@@ -517,15 +662,20 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     'is_ebcdic':is_ebcdic,
   }
 
-  if is_uft:
-    _UftSend(keywords,
-         file_info,
-         data_buffer)
-  else:
-    _ReaderSend(keywords,
-          file_info,
-          data_buffer)
+  match keywords['transport']:
+    case Transport.UFT:
+      _UftSend(keywords, file_info, data_buffer)
 
+    case Transport.RDR:
+      _ReaderSend(keywords, file_info, data_buffer)
+
+    case Transport.FTP:
+      _FTPSend(keywords, file_info, data_buffer)
+
+    case _:
+      # This shuld never happen (trappd by arg parsing)
+      print('Invalid transport:', keywords['transport'])
+      sys.exit(99)
 
 def _MakeTranslateTable():
   """Build an ASCII to EBCDIC translation table."""

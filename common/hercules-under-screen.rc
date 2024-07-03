@@ -1,74 +1,86 @@
-sh screen -t console	1	c3270	-model 2 console@127.0.0.1 ${HERCULES_CONSOLE}
+sh screen -t console	1	c3270	-model 2 console@${HERCULES_ADDRESS:=127.0.0.1} ${HERCULES_CONSOLE}
 
-# Run any pre-IPL machine specific commands, telnet to the console.
+* Run any pre-IPL machine specific commands, telnet to the console.
 sh [ -x hercules.prologue.sh ] && ./hercules.prologue.sh
 
-# This assumes logging is started from the command line that Hercules is invoked
-# via
+* This assumes logging is started from the command line that Hercules is invoked
+* via
 sh screen -t log	2	less	+F -S -I log/hercules-$(HERCULES_NAME).log
 
-# Must be after IPL and printer is opened.
+* Must be after IPL and printer is opened.
 hao tgt HHCPR007I.+(030E|01E)
 hao cmd sh sleep 5 && screen -t syslog        3       less +F -S -I log/syslog-$(HERCULES_NAME).log
 
-# If ESA or Z arch and running OS, when SYSCONs goes active make it an
-# active console
+* If ESA or Z arch and running OS, when SYSCONs goes active make it an
+* active console
 hao tgt (HHCCP041I SYSCONS|HHC00006I SCLP console) interface active
 hao cmd . vary cn(*),activate
 
-# Skip DUMP tape drive query
+* Skip DUMP tape drive query
 hao tgt IEA135A
 hao cmd R 00,'no'
 
-# Provide the time if clock is invalid
+* Provide the time if clock is invalid
 hao tgt ([0-9]{2}) 00 IEE116A TOD CLOCK INVALID
 hao cmd /R $1,$(HERCULES_IPL_TIME)
 
-# Use HASP, not ASP, after MVT clock set
+* Use HASP, not ASP, after MVT clock set
 hao tgt IEE114A
 hao cmd /r 00,auto=n
 
-# Wait for mounts which can't honored (yet) due to contention 
+* Wait for mounts which can't honored (yet) due to contention 
 hao tgt ([0-9]{2}) IEF864D REPLY 'RETRY' OR 'CANCEL' OR 'WAIT'
 hao cmd /r $1,wait
 
-# Vary MVS console online if no master console found (mostly seen on
-# slow host systems at start up). Must use CONSOLE and not MSTCONS
+* Vary MVS console online if no master console found (mostly seen on
+* slow host systems at start up). Must use CONSOLE and not MSTCONS
 hao tgt IEE141A MASTER AND ALL ALTERNATES UNAVAILABLE
 hao cmd /V 010,CONSOLE
 
-# If we lose the syslog, route the log to the printer log.
-# (Doesn't work because of non-master console authority issues.)
+* If we lose the syslog, route the log to the printer log.
+* (Doesn't work because of non-master console authority issues.)
 hao tgt IEE143I  01F NOW RECEIVING HARDCOPY, REASON=HCSW
 hao cmd /V 30E,HARDCPY,STCMDS,ROUT=ALL
 
-# Automatically route any TAP network device to the local live subnet
+* Automatically run SMF DUMP if needed on OS/390 & z/OS
+hao tgt IEE362A SMF ENTER DUMP FOR SYS1.MAN([A-Z0-9])
+hao cmd . S SMFDUMP,MAN=$1
+
+* Automatically bring secondary console online on OS/390 & z/OS
+* when it connects.  THIS IS A SECURITY HOLE ON INSECURE NETWORKS.
+hao tgt HHC01018I 0:(0908) COMM: client .+ devtype 3270: connected
+hao cmd . V $1,console
+
+
+* Automatically route any TAP network device to the local live subnet
 hao tgt HHCLC055I (tap[0-9]+)
 hao cmd sh hercules_route_lcs.py -d $1 $(HERCULES_NAME).oat
 
-# Respond to our not very secret master password prompt
+* Respond to our not very secret master password prompt
 hao tgt ([0-9]{2}) IEC301A S JOB .+ DSNAME SYS1.VMASTCAT
 hao cmd /r $1,$(HERCULES_MASTCAT)
 
-# We run most base disk R/O so the shadow file merge below never wipes the
-# first generation; live updates go into the second generation.
-#
-# Nightly backups are your friend!
+* Respond to confirmation of ZFS should down
+hao tgt ([0-9]{2}) BPXI078D STOP OF ZFS REQUESTED. REPLY '([A-Z])' TO PROCEED
+hao cmd /r $1,$2
 
-sf- *
-pause 5
-sf+ *
-pause 5
+* writelog when JES2 is resdy for beddy-bye
+hao tgt $HASP099 ALL AVAILABLE FUNCTIONS COMPLETE
+hao cmd writelog 
+
+*
+*	The main event ...
+*
 
 ipl $(HERCULES_IPL)
 
-# Run any post-IPL machine specific commands, like "less" on the MVS
-# log or a pr3287 session.
+* Run any post-IPL machine specific commands, like "less" on the MVS
+* log or a pr3287 session.
 sh [ -x hercules.coda.sh ] && ./hercules.coda.sh
 
-# If we have an OAT file which configures a network connection, and
-# the hostname is in DNS, tell the network of the host that the emulated
-# machine is reachable via the host.
-#
-# Assumes Linux simple interface name!
+* If we have an OAT file which configures a network connection, and
+* the hostname is in DNS, tell the network of the host that the emulated
+* machine is reachable via the host.
+*
+* Assumes Linux simple interface name!
 sh [ -f $(HERCULES_NAME).oat ] && host $(HERCULES_NAME) | grep -q address && sudo arp -i eth0 -Ds $(HERCULES_NAME) eth0 pub
