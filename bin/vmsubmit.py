@@ -176,7 +176,7 @@ def _ParseCommandLine(command_line):
       '--filemode',
       default='A1',
       metavar='FM',
-      help='Filemode (class) to spool file as.'
+      help='Filemode (class) to spool file as. '
       '(Default: %(default)s)',
       type=_StringToken,
   )
