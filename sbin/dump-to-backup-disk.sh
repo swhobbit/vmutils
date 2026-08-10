@@ -110,8 +110,11 @@ DIRECTORIES=""
 # Directories only backed up only if the root of their own file system;
 # otherwise they get backed up as part of their parent file system.
 for entry in	\
-      export/git	\
-      home/hercules
+	export/git	\
+	export/virtualbox	\
+	home/bochs	\
+	home/hercules	\
+	home/simh
   do
     # Note leading slash added for fs check
     if is_directory_fs_root /${entry} ; then
