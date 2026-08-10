@@ -62,7 +62,7 @@ hao cmd /r $1,$(HERCULES_MASTCAT)
 
 * Respond to confirmation of ZFS should down
 hao tgt ([0-9]{2}) BPXI078D STOP OF ZFS REQUESTED. REPLY '([A-Z])' TO PROCEED
-hao cmd /r $1,$2
+hao cmd . $1,$2
 
 * writelog when JES2 is resdy for beddy-bye
 hao tgt $HASP099 ALL AVAILABLE FUNCTIONS COMPLETE
@@ -71,6 +71,8 @@ hao cmd writelog
 *
 *	The main event ...
 *
+
+pause 2
 
 ipl $(HERCULES_IPL)
 
