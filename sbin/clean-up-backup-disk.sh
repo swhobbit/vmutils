@@ -6,7 +6,7 @@ BACKUP_DIRECTORY=/export/backup
 CLEANED=false
 CLEANUP_TOUCH_FILE="${BACKUP_DIRECTORY}/status-clean-$(hostname -s).touch"
 DAILY_DIFFERENTIAL_DAYS_TO_DELETE_AFTER=28
-DAYS_OF_CLEANUP=$(date +%d)
+DAYS_OF_CLEANUP="$(expr $(date +%d) + 0)"
 DAYS_OF_DIFFERENTIAL_BACKUP=6
 FULL_WEEKLY_DAYS_TO_DELETE_AFTER=91
 MIN_DAYS_TO_DELETE_AFTER=60
@@ -34,13 +34,13 @@ log_message () {
 
 # Log an error message to both system log and stderr
 log_error () {
-	log_message error --stderr "${@:?'No error message specified'}"
+	log_message error --stderr -- "${@:?'No error message specified'}"
 }
 
 
 # Log a notice message to both system log and stderr
 log_notice () {
-	log_message notice --stderr "${@:?'No notice specified'}"
+	log_message notice --stderr -- "${@:?'No notice specified'}"
 }
 
 
@@ -91,6 +91,17 @@ if [ 0 -ne $? ] ; then
 	exit 2
 fi
 
+# Determine date of oldest full backup
+OLDEST_DUMP_FILE="`ls -rt ${BACKUP_DIRECTORY}/dump-*-full.tgz | fmt -1 | head -1`"
+OLDEST_DUMP_EPOCH_DAY="$(expr $(date -r ${OLDEST_DUMP_FILE} +%s ) / ${SECONDS_PER_DAY} )"
+CURRENT_EPOCH_DAY="$expr( $(date +%s) / ${SECONDS_PER_DAY} )"
+DAYS_TO_DELETE_AFTER="$(expr $CURRENT_EPOCH_DAY - $OLDEST_DUMP_EPOCH_DAY - $DAYS_OF_DIFFERENTIAL_BACKUP )"
+ALLOWED_PERCENT_IN_USE=${HIGH_WATER_PERCENT_IN_USE}
+
+log_notice	\
+	"Oldest backup ${OLDEST_DUMP_FILE} is" \
+	"$(expr ${CURRENT_EPOCH_DAY} - ${OLDEST_DUMP_EPOCH_DAY} ) days old"
+
 # Delete obsolete (over CLEANUP_TOUCH_FILE days old) touch files (which
 # will force a monthly clean of back files every CLEANUP_TOUCH_FILE +
 # 1 days).
@@ -103,8 +114,12 @@ find	\
 	-delete
 
 # Do monthly optional clean up; if we're truly low on space when we are
-# not doing this clean up, some of these files may get scrubbed anyway
-# below.
+# not doing this clean up, we run this early.
+
+if [ $(file_system_percent_in_use ${BACKUP_DIRECTORY}) -ge ${ALLOWED_PERCENT_IN_USE} ]; then
+	rm ${CLEANUP_TOUCH_FILE}
+fi
+
 if [ ! -f ${CLEANUP_TOUCH_FILE} ] ; then
 	log_notice "DEEP CLEAN"
 
@@ -152,23 +167,11 @@ if [ ! -f ${CLEANUP_TOUCH_FILE} ] ; then
 
 	touch "${CLEANUP_TOUCH_FILE}"
 else 
-	log_notice "No deep clean performed"
-	ls -l "${CLEANUP_TOUCH_FILE}"
+	log_notice "No deep clean performed: " $(ls -l "${CLEANUP_TOUCH_FILE}")
 	echo ' '
 fi
 
-# Determine date of oldest full backup
-OLDEST_DUMP_FILE="`ls -rt ${BACKUP_DIRECTORY}/dump-*-full.tgz | fmt -1 | head -1`"
-OLDEST_DUMP_EPOCH_DAY="$(expr $(date -r ${OLDEST_DUMP_FILE} +%s ) / ${SECONDS_PER_DAY} )"
-CURRENT_EPOCH_DAY="$expr( $(date +%s) / ${SECONDS_PER_DAY} )"
-DAYS_TO_DELETE_AFTER="$(expr $CURRENT_EPOCH_DAY - $OLDEST_DUMP_EPOCH_DAY - $DAYS_OF_DIFFERENTIAL_BACKUP )"
-
-log_notice	\
-	"Oldest backup ${OLDEST_DUMP_FILE} is" \
-	"$(expr ${CURRENT_EPOCH_DAY} - ${OLDEST_DUMP_EPOCH_DAY} ) days old"
-
 first_pass=true
-ALLOWED_PERCENT_IN_USE=${HIGH_WATER_PERCENT_IN_USE}
 while [ $(file_system_percent_in_use ${BACKUP_DIRECTORY}) -ge ${ALLOWED_PERCENT_IN_USE} ]	\
 	&& [ ${DAYS_TO_DELETE_AFTER} -ge ${MIN_DAYS_TO_DELETE_AFTER} ]
 do
@@ -183,7 +186,8 @@ do
 		-ls	\
 		-delete	\
 		| sort -k 11
-	DAYS_TO_DELETE_AFTER="$(expr ${DAYS_TO_DELETE_AFTER} - $DAYS_OF_DIFFERENTIAL_BACKUP - 1)"
+	# Step forward another month of backups if needed.
+	DAYS_TO_DELETE_AFTER="$(expr ${DAYS_TO_DELETE_AFTER} - 30)"
 	ALLOWED_PERCENT_IN_USE=${LOW_WATER_PERCENT_IN_USE}
 	first_pass=false
 done
