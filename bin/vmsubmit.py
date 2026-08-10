@@ -104,6 +104,7 @@ def _ParseCommandLine(command_line):
       f'and {UFT_DEFAULT_PORT} for UFT connections)',
       type=_PositiveInteger,
   )
+
   parser.add_argument(
       '-l',
       '--login',
@@ -114,6 +115,7 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_StringToken,
   )
+
   parser.add_argument(
       '-P',
       '--password',
@@ -123,6 +125,7 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_StringToken,
   )
+
   parser.add_argument(
       '-a',
       '--account',
@@ -133,6 +136,7 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_StringToken,
   )
+
   parser.add_argument(
       '-r',
       '--remote_node',
@@ -144,6 +148,7 @@ def _ParseCommandLine(command_line):
       type=_StringToken,
   )
   transports = ', '.join(list(Transport))
+
   parser.add_argument(
       '-T',
       '--transport',
@@ -154,6 +159,7 @@ def _ParseCommandLine(command_line):
       'to send the file via. '
       '(Default: %(default)s)'
   )
+
   parser.add_argument(
       '-t',
       '--filetype_default',
@@ -164,6 +170,7 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_StringToken,
   )
+
   parser.add_argument(
       '-m',
       '--filemode',
@@ -173,6 +180,7 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_StringToken,
   )
+
   parser.add_argument(
       '-e',
       '--ebcdic',
@@ -185,6 +193,7 @@ def _ParseCommandLine(command_line):
       'enabled for files of type VMARC and XMI, '
       'which are always in EBCDIC.)'
   )
+
   parser.add_argument(
       '-o',
       '--os',
@@ -201,6 +210,7 @@ def _ParseCommandLine(command_line):
       'remote systems with OS or MVS in their name '
       'and for files of type XMI, JCL, or JOB.)'
   )
+
   parser.add_argument(
       '-R',
       '--rscs_vm',
@@ -211,6 +221,7 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_StringToken,
   )
+
   parser.add_argument(
       '-s',
       '--sleep',
@@ -220,18 +231,29 @@ def _ParseCommandLine(command_line):
       '(Default: %(default)s)',
       type=_PositiveInteger,
   )
+
   parser.add_argument(
     '-d',
     '--debug',
-    default=0,
-    action='count',
-    help='Report additional debugging information about the transfer. '
+    default=False,
+    action='store_true',
+    help='Report all debugging information about the transfer. '
     '(Default: %(default)s)')
+
+  parser.add_argument(
+    '-V',
+    '--verbose',
+    default=False,
+    action='store_true',
+    help='Report some information about the transfer. '
+    '(Default: %(default)s)')
+
   parser.add_argument(
       '-v',
       '--version',
       action='version',
       version='%(prog)s ' + __version__)
+
   parser.add_argument(
       'file',
       nargs='+',
@@ -281,10 +303,10 @@ def _Send(network_socket, buffer, debug, translate=False):
     print('')
 
 
-def _Expect(network_socket, prompt, expected, debug):
+def _Expect(network_socket, prompt, expected, verbose):
   """Write a line to the server & look for any of the expected response(s)"""
   if prompt:
-    if debug:
+    if verbose:
       print(f'Sending:  {prompt},\twant: {expected}')
     _Send(network_socket, f'{prompt}\r\n', False)
 
@@ -312,10 +334,10 @@ def _Expect(network_socket, prompt, expected, debug):
      f'\nSent: {prompt},\nExpected: {expected},\nReceived: {actual}')
 
 
-def _CharacterSet(is_ebcdic):
+def _CharacterSet(ebcdic):
   """Report Character set in use as a string."""
 
-  if is_ebcdic:
+  if ebcdic:
     return "EBCDIC"
 
   return "ASCII"
@@ -328,47 +350,47 @@ def _UftPrologue(keywords,
   _Expect(network_socket,
       None,
       ('2', HTTPStatus.CONTINUE),
-      keywords['debug'])
+      keywords['verbose'])
   _Expect(network_socket,
       f'FILE {file_info["length"]} {getpass.getuser().upper()}',
       (HTTPStatus.CREATED, HTTPStatus.OK),
-      keywords['debug'])
+      keywords['verbose'])
   _Expect(network_socket,
       f'USER {keywords["login"]}',
       HTTPStatus.OK,
-      keywords['debug'])
+      keywords['verbose'])
 
-  if file_info['is_ebcdic']:
+  if file_info['ebcdic']:
     _Expect(network_socket,
         'TYPE I', (HTTPStatus.CREATED, HTTPStatus.OK),
-        keywords['debug'])
+        keywords['verbose'])
     _Expect(network_socket,
         'LRECL 80', (HTTPStatus.CREATED, HTTPStatus.OK),
-        keywords['debug'])
+        keywords['verbose'])
   else:
     _Expect(network_socket,
         'TYPE A', (HTTPStatus.CREATED, HTTPStatus.OK),
-        keywords['debug'])
+        keywords['verbose'])
 
   _Expect(network_socket,
       f'NAME {file_info["fname"]}.{file_info["ftype"]}',
       (HTTPStatus.CREATED, HTTPStatus.OK),
-      keywords['debug'])
+      keywords['verbose'])
 
   if keywords["remote_node"]:
     _Expect(network_socket,
         f'DEST {keywords["remote_node"]}',
         (HTTPStatus.CREATED, HTTPStatus.OK),
-        keywords['debug'])
+        keywords['verbose'])
 
   _Expect(network_socket,
       f'DATE {file_info["date"]}',
       (HTTPStatus.CREATED, HTTPStatus.OK),
-      keywords['debug'])
+      keywords['verbose'])
   _Expect(network_socket,
       f'DATA {file_info["length"]}',
        (123, HTTPStatus.CREATED),
-       keywords['debug'])
+       keywords['verbose'])
 
 
 def _UftSend(keywords,
@@ -376,14 +398,14 @@ def _UftSend(keywords,
        data_buffer):
   """Send a file to the IBM host via a remote UFT server"""
 
-  if not file_info['is_ebcdic']:
+  if not file_info['ebcdic']:
     # Internet protocol is \r\n for new lines.
     data_buffer = data_buffer.replace('\n', '\r\n')
     file_info['length'] = len(data_buffer)
 
-  if keywords['debug']:
+  if keywords['verbose']:
     print(f'Opening UFT host {_HostName(keywords, port=True)} '
-        f'for {_CharacterSet(file_info["is_ebcdic"])} '
+        f'for {_CharacterSet(file_info["ebcdic"])} '
         f'file {file_info["fname"]}.{file_info["ftype"]} '
         f'with {file_info["length"]} bytes '
         f'for user {keywords["login"]})')
@@ -407,10 +429,10 @@ def _UftSend(keywords,
         keywords['debug'])
     _Expect(network_socket,
         'EOF', ('213', HTTPStatus.OK),
-        keywords['debug'])
+        keywords['verbose'])
     _Expect(network_socket,
         'QUIT', ('250', HTTPStatus.OK),
-        keywords['debug'])
+        keywords['verbose'])
   finally:
     try:
       network_socket.shutdown(socket.SHUT_RDWR) # pylint: disable=E1101
@@ -470,7 +492,7 @@ def _ReaderPrologue(keywords,
 
   for card in (id_card, tag_card, read_card):
     if card:
-      if file_info['is_ebcdic']:
+      if file_info['ebcdic']:
         card = f'{card:80}'.translate(TRANSLATE_TABLE)
       else:
         card = card + '\n'
@@ -482,9 +504,9 @@ def _ReaderSend(keywords,
         data_buffer):
   """Send a file to the IBM host via a networked VM virtual reader"""
 
-  if keywords['debug']:
+  if keywords['verbose']:
     print(f'Opening VM reader on host {_HostName(keywords, port=True)} '
-        f'for {_CharacterSet(file_info["is_ebcdic"])} file '
+        f'for {_CharacterSet(file_info["ebcdic"])} file '
         f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
         f'for user {keywords["login"]}')
 
@@ -522,9 +544,9 @@ def _FTPSend(keywords,
             data_buffer):
   """Send a file to the IBM host via FTP"""
 
-  if keywords['debug']:
-    print(f'Opening VM reader on host {_HostName(keywords, port=True)} '
-        f'for {_CharacterSet(file_info["is_ebcdic"])} file '
+  if keywords['verbose']:
+    print(f'Opening FTP host {_HostName(keywords, port=True)} '
+        f'for {_CharacterSet(file_info["ebcdic"])} file '
         f'{file_info["fname"]} {file_info["ftype"]} {file_info["fmode"]} '
         f'for user {keywords["login"]}')
 
@@ -584,7 +606,7 @@ def _FTPSend(keywords,
       print('System', _HostName(keywords), 'is running unsupported', token[1])
       sys.exit(95)
 
-  if keywords['debug']:
+  if keywords['verbose']:
     print('System', _HostName(keywords), 'is running', token[1])
 
   stor_command = (f'STOR '
@@ -592,7 +614,7 @@ def _FTPSend(keywords,
                   f'{file_info["ftype"]}.'
                   f'{file_info["fmode"]}')
 
-  if file_info['is_ebcdic']:
+  if file_info['ebcdic']:
     with io.BytesIO(initial_bytes=data_buffer) as handle:
       connection.storbinary(stor_command, handle)
   else:
@@ -610,16 +632,6 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
   length = path.getsize(file_path)
   date = time.strftime('%D %T', time.localtime(path.getmtime(file_path)))
 
-  _DEFAULT_PORT = {
-    Transport.FTP: FTP_DEFAULT_PORT,
-    Transport.RDR: (ASCII_DEFAULT_PORT,
-                    EBCDIC_DEFAULT_PORT)[keywords['ebcdic']],
-    Transport.UFT: UFT_DEFAULT_PORT
-  }
-
-  if not keywords['port']:
-    keywords['port'] = _DEFAULT_PORT[keywords['transport']]
-
   base_name = path.basename(file_path).replace('_', '$').upper()
   base_name = base_name.strip().strip('.').split('.')
   fname = base_name[0]
@@ -630,15 +642,27 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     ftype = base_name[1][:8]
   fmode = keywords['filemode'][:2]
 
-  is_ebcdic = keywords['ebcdic'] or ftype in ('VMARC', 'XMI')
+  keywords['ebcdic'] = keywords['ebcdic'] or ftype in ('VMARC', 'XMI')
 
-  if is_ebcdic and length % 80:
+  keywords['verbose'] = keywords['verbose'] or keywords['debug']
+
+  _DEFAULT_PORT = {
+    Transport.FTP: FTP_DEFAULT_PORT,
+    Transport.RDR: (ASCII_DEFAULT_PORT,
+                    EBCDIC_DEFAULT_PORT)[keywords['ebcdic']],
+    Transport.UFT: UFT_DEFAULT_PORT
+  }
+
+  if not keywords['port']:
+    keywords['port'] = _DEFAULT_PORT[keywords['transport']]
+
+  if keywords['ebcdic'] and length % 80:
     raise RuntimeError(f'Length of file {file_path} '
                f'is not a multiple of 80, it is {length}')
 
   # Ignore possible use of "with", we have two opens for the same handle
   # pylint: disable=R1732
-  if is_ebcdic:
+  if keywords['ebcdic']:
     with open(file_path, 'rb') as file_handle:
       data_buffer = file_handle.read()
   else:
@@ -650,7 +674,7 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
 
   # Insure any ASCII file ends with a new line, unless it was completely
   # empty
-  if (not is_ebcdic and data_buffer and data_buffer[-1] != '\n'):
+  if (not keywords['ebcdic'] and data_buffer and data_buffer[-1] != '\n'):
     data_buffer += '\n'
 
   file_info = {
@@ -659,7 +683,7 @@ def _ProcessFile(file_path, keywords):   # pylint: disable=R0914
     'fmode':fmode,
     'date':date,
     'length':length,
-    'is_ebcdic':is_ebcdic,
+    'ebcdic':keywords['ebcdic'],
   }
 
   match keywords['transport']:
