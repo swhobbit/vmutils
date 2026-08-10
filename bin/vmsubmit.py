@@ -19,10 +19,10 @@ import socket
 import sys
 import time
 
-__version__ = '1.3.1'
+__version__ = '1.3.2'
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 __copyright__ = ('Version ' + __version__ + '. '
-                 'Copyright 2018-2024 by Kendra Electronic Wonderworks. '
+                 'Copyright 2018-2026 by Kendra Electronic Wonderworks. '
                  'All commercial rights reserved.\n'
                 )
 
