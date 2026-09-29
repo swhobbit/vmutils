@@ -19,7 +19,7 @@ import socket
 import sys
 import time
 
-__version__ = '1.3.2'
+__version__ = '1.3.3'
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 __copyright__ = ('Version ' + __version__ + '. '
                  'Copyright 2018-2026 by Kendra Electronic Wonderworks. '
@@ -265,14 +265,17 @@ def _ParseCommandLine(command_line):
 
 def _HostName(keywords, port=False):
   """Format hostname, host IP address, and port for messages."""
-  if port:
+  try:
+    if port:
+      return (f'{socket.gethostbyaddr(keywords["host"])[0]}:'
+              f'{keywords["port"]} '
+              f'({keywords["host"]})')
+
     return (f'{socket.gethostbyaddr(keywords["host"])[0]}:'
             f'{keywords["port"]} '
             f'({keywords["host"]})')
-
-  return (f'{socket.gethostbyaddr(keywords["host"])[0]}:'
-          f'{keywords["port"]} '
-          f'({keywords["host"]})')
+  except (socket.herror) as ex:
+    return (f'{keywords["host"]}:{keywords["port"]}')
 
 def _Send(network_socket, buffer, debug, translate=False):
   """Write buffer, translating if needed and making strings bytes."""
