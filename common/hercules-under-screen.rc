@@ -64,7 +64,7 @@ hao cmd /r $1,$(HERCULES_MASTCAT)
 hao tgt ([0-9]{2}) BPXI078D STOP OF ZFS REQUESTED. REPLY '([A-Z])' TO PROCEED
 hao cmd . $1,$2
 
-* writelog when JES2 is resdy for beddy-bye
+* writelog when JES2 is ready for beddy-bye
 hao tgt $HASP099 ALL AVAILABLE FUNCTIONS COMPLETE
 hao cmd writelog 
 
