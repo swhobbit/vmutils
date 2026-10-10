@@ -21,7 +21,7 @@
 # *                    Kenmore, WA                                     *
 # *------------------------------------------------------------------- *
 
-if [ "${USER}" != "hercules" ] ; then 
+if [ "${USER}" != "hercules" ] ; then
         echo "Script $0 must be run as user hercules"
         sleep 2
         exit 88
@@ -125,11 +125,11 @@ BINARY_BASENAME="$(basename ${BINARY_LINK})"
 
 if [ ".${HERCULES_VERSION}" = ".spinhawk" ] ; then
         # Spinhawk (old) hercules, no date on log info
-        echo "${BINARY_BASENAME}" -f ${HERCULES_NAME}.conf "|" datestamp ">" ${LOG_PATH}
-        "${BINARY_BASENAME}" -f ${HERCULES_NAME}.conf | datestamp.sh > ${LOG_PATH}
+        echo "${BINARY_BASENAME}" -f ${HERCULES_NAME}.conf "|" datestamp > ${LOG_PATH}
+        "${BINARY_BASENAME}" -f ${HERCULES_NAME}.conf | datestamp.sh >> ${LOG_PATH}
 else
-        echo HERCULES_RC=../common/shadow-hercules-under-screen.rc "${BINARY_BASENAME}" -f ${HERCULES_NAME}-dasd-io.conf ">" ${LOG_PATH}
-        HERCULES_RC=../common/shadow-hercules-under-screen.rc "${BINARY_BASENAME}" -f ${HERCULES_NAME}-dasd-io.conf > ${LOG_PATH} || (sleep 5 ; exit 99)
+        echo HERCULES_RC=../common/shadow-hercules-under-screen.rc "${BINARY_BASENAME}" -f ${HERCULES_NAME}-dasd-io.conf > ${LOG_PATH}
+        HERCULES_RC=../common/shadow-hercules-under-screen.rc "${BINARY_BASENAME}" -f ${HERCULES_NAME}-dasd-io.conf >> ${LOG_PATH} || (sleep 5 ; exit 99)
         echo "${BINARY_BASENAME}" -f ${HERCULES_NAME}.conf ">>" ${LOG_PATH}
         exec "${BINARY_BASENAME}" -f ${HERCULES_NAME}.conf >> ${LOG_PATH}
 fi
