@@ -19,7 +19,7 @@ import socket
 import sys
 import time
 
-__version__ = '1.3.3'
+__version__ = '1.3.4'
 __author__ = 'ahd@kew.com (Drew Derbyshire)'
 __copyright__ = ('Version ' + __version__ + '. '
                  'Copyright 2018-2026 by Kendra Electronic Wonderworks. '
@@ -32,6 +32,8 @@ ASCII_DEFAULT_PORT = int(os.getenv('HERCULES_ASCII_READER', default='1442'))
 EBCDIC_DEFAULT_PORT = int(os.getenv('HERCULES_EBCDIC_READER', default='2540'))
 UFT_DEFAULT_PORT = int(os.getenv('HERCULES_SIFT_PORT', default='608')) 
 FTP_DEFAULT_PORT = socket.getservbyname('ftp')
+
+HOSTNAME_DEFAULT = os.getenv('HERCULES_HOSTNAME', default='Hercules') 
 
 class Transport(enum.StrEnum):
   """Choices for our transport protocol"""
@@ -83,7 +85,7 @@ def _ParseCommandLine(command_line):
   parser.add_argument(
       '-H',
       '--host',
-      default='Hercules',
+      default=HOSTNAME_DEFAULT,
       help='The TCP/IP hostname of the server to connect to; '
       'files are delivered to '
       'the specified login on this host unless the UFT or remote node options '
